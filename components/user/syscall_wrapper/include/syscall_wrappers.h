@@ -92,6 +92,7 @@ esp_err_t usr_esp_user_ota_cancel_rollback(void);
 
 int usr_get_internal_temperature();
 esp_err_t usr_start_internal_temperature(temp_sensor_config_t * conf);
+int usr_add_a_b(int a, int b);
 
 #ifdef __cplusplus
 }

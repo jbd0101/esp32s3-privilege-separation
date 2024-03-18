@@ -1003,6 +1003,9 @@ esp_err_t usr_start_internal_temperature(temp_sensor_config_t *conf)
     return EXECUTE_SYSCALL(conf, __NR_start_internal_temperature);
 }
 
+int usr_add_a_b(int a, int b){
+    return EXECUTE_SYSCALL(a, b, __NR_add_a_b);
+}
 
 UIRAM_ATTR bool usr_spi_flash_cache_enabled(void)
 {

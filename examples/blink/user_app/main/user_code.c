@@ -40,7 +40,30 @@ static int g_state = 0;
 
 static const char *TAG = "user_main";
 
+/*
+ * matrice of nxn sum function , where n is the size of the matrix a[
+ */
+int *usr_syscall_mat_sum(int *a,int *b,int n)
+{
+    int *c = malloc(sizeof(int)*n*n);
+    for(int i=0;i<n;i++){
+        for(int j=0;j<n;j++){
+            c[i*n+j] = usr_add_a_b(a[i*n+j],b[i*n+j]);
+        }
+    }
+    return c;
+}
 
+int *usr_normal_mat_sum(int *a,int *b,int n)
+{
+    int *c = malloc(sizeof(int)*n*n);
+    for(int i=0;i<n;i++){
+        for(int j=0;j<n;j++){
+            c[i*n+j] = a[i*n+j]+b[i*n+j];
+        }
+    }
+    return c;
+}
 /* User space code is never executed in ISR context,
  * so user registered "ISR" functions are actually executed
  * from task's context, hence they are termed as softISRs
@@ -65,12 +88,35 @@ void blink_task()
         ESP_LOGI(TAG, "Blinking LED");
         gpio_ll_set_level(&GPIO, BLINK_GPIO, 1);
         vTaskDelay(100);
+        int a = 1;
+        int b = 2;
+        int c = usr_add_a_b(a, b);
+        ESP_LOGI(TAG, "Sum of %d and %d is %d", a, b, c);
 
         gpio_ll_set_level(&GPIO, BLINK_GPIO, 0);
         vTaskDelay(100);
         int temp = usr_get_internal_temperature();
         ESP_LOGI(TAG, "Temperature: %d \n", temp);
         vTaskDelay(100);
+        int *a1 = malloc(sizeof(int)*4);
+        int *b1 = malloc(sizeof(int)*4);
+        for(int i=0;i<4;i++){
+            a1[i] = i;
+            b1[i] = i;
+        }
+        int *c1 = usr_normal_mat_sum(a1,b1,2);
+        for(int i=0;i<4;i++){
+            ESP_LOGI(TAG, "Sum of %d and %d is %d", a1[i], b1[i], c1[i]);
+        }
+        int *c2 = usr_syscall_mat_sum(a1,b1,2);
+        for(int i=0;i<4;i++){
+            ESP_LOGI(TAG, "Sum of %d and %d is %d", a1[i], b1[i], c2[i]);
+        }
+        free(a1);
+        free(b1);
+        free(c1);
+        free(c2);
+
     }
 }
 
@@ -83,6 +129,7 @@ void user_main()
     io_conf.pull_down_en = 0;
     io_conf.pull_up_en = 0;
     gpio_config(&io_conf);
+
     usr_start_internal_temperature(&temp_sensor);
     /*
     io_conf.pin_bit_mask = (1 << INTR_LED);

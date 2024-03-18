@@ -2252,6 +2252,9 @@ int sys_get_internal_temperature()
     temp_sensor_read_celsius(&tempe);
     return (int)tempe;
 }
+int sys_add_a_b(int a, int b){
+    return a+b;
+}
 
 
 #ifdef CONFIG_ESP_SYSCALL_VERIFY_RETURNED_POINTERS

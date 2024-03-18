@@ -199,3 +199,4 @@
 ## JC
 1058  custom  get_internal_temperature                sys_get_internal_temperature
 1059  custom  start_internal_temperature              sys_start_internal_temperature
+1060  custom  add_a_b               sys_add_a_b
