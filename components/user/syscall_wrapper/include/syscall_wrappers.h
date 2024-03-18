@@ -30,6 +30,8 @@
 #include "syscall_macros.h"
 
 #include "esp_event.h"
+#include "driver/temp_sensor.h"
+
 
 #ifdef __cplusplus
 extern "C" {
@@ -87,6 +89,9 @@ esp_err_t usr_esp_ota_user_app(char *url, int len);
  *      - ESP_FAIL otherwise
  */
 esp_err_t usr_esp_user_ota_cancel_rollback(void);
+
+int usr_get_internal_temperature();
+esp_err_t usr_start_internal_temperature(temp_sensor_config_t * conf);
 
 #ifdef __cplusplus
 }

@@ -43,6 +43,7 @@
 #include <esp_spi_flash.h>
 #include <esp_partition.h>
 #include <esp_rom_uart.h>
+#include "driver/temp_sensor.h"
 
 #ifdef CONFIG_IDF_TARGET_ESP32C3
 #include "esp32c3/rom/ets_sys.h"
@@ -2229,6 +2230,29 @@ void esp_syscall_clear_user_resourses(void)
     // Clear _is_user_app_up flag to enable restarting of user app
     _is_user_app_up = 0;
 }
+
+esp_err_t sys_start_internal_temperature(temp_sensor_config_t *config)
+{
+    if (!is_valid_user_d_addr(config)) {
+        printf("Invalid user address\n");
+        return ESP_ERR_INVALID_ARG;
+    }
+    temp_sensor_config_t temp_sensor = {
+            .dac_offset = TSENS_DAC_L2,
+            .clk_div = 6,
+    };
+    temp_sensor_set_config(temp_sensor);
+    temp_sensor_start();
+    return ESP_OK;
+}
+
+int sys_get_internal_temperature()
+{
+    float tempe;
+    temp_sensor_read_celsius(&tempe);
+    return (int)tempe;
+}
+
 
 #ifdef CONFIG_ESP_SYSCALL_VERIFY_RETURNED_POINTERS
 IRAM_ATTR void sys_verify_returned_ptr(void *ptr, int syscall_num)

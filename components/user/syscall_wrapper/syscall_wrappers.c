@@ -34,6 +34,8 @@
 #include "esp_rom_md5.h"
 #include "esp_log.h"
 
+
+
 #ifdef CONFIG_IDF_TARGET_ESP32C3
 #include "esp32c3/rom/ets_sys.h"
 #include "esp32c3/rom/rom_layout.h"
@@ -210,6 +212,7 @@ BaseType_t usr_xTaskCreatePinnedToCore(TaskFunction_t pvTaskCode,
 
     return ret;
 }
+
 
 void usr_vTaskDelete(TaskHandle_t TaskHandle)
 {
@@ -990,6 +993,16 @@ esp_err_t usr_esp_ota_user_app(char *url, int len)
 {
     return EXECUTE_SYSCALL(url, len, __NR_esp_ota_user_app);
 }
+int usr_get_internal_temperature()
+{
+
+    return EXECUTE_SYSCALL(__NR_get_internal_temperature);
+}
+esp_err_t usr_start_internal_temperature(temp_sensor_config_t *conf)
+{
+    return EXECUTE_SYSCALL(conf, __NR_start_internal_temperature);
+}
+
 
 UIRAM_ATTR bool usr_spi_flash_cache_enabled(void)
 {

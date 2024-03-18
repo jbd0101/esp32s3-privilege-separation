@@ -27,8 +27,16 @@
 #include "esp_log.h"
 #include "esp_priv_access.h"
 #include "ws2812.h"
-
-#define TAG             "protected_app"
+//temperature
+#include "driver/i2c.h"
+//builtin temperature sensor
+#include "driver/temp_sensor.h"
+#define TAG "protected_app"
+/*
+temp_sensor_config_t temp_sensor = {
+        .dac_offset = TSENS_DAC_L2,
+        .clk_div = 6,
+};*/
 
 IRAM_ATTR void user_app_exception_handler(void *arg)
 {
@@ -45,8 +53,9 @@ void app_main()
     }
 
     esp_priv_access_set_periph_perm(PA_GPIO, PA_WORLD_1, PA_PERM_ALL);
+    //temp_sensor_set_config(temp_sensor);
+    //ret = temp_sensor_start();
 
-    esp_ws2812_device_register("/dev/ws2812");
 
     ret = esp_priv_access_user_boot();
     if (ret != ESP_OK) {
@@ -55,6 +64,9 @@ void app_main()
 
     for (int i = 0; ; i++) {
        ets_printf("Hello from protected environment\n");
+       //float temp;
+        //temp_sensor_read_celsius(&temp);
+        //printf("Temperature: %.2f\n", temp);
        vTaskDelay(500);
     }
 }
