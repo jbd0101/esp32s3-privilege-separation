@@ -1007,6 +1007,10 @@ int usr_add_a_b(int a, int b){
     return EXECUTE_SYSCALL(a, b, __NR_add_a_b);
 }
 
+uint32_t usr_esp_log_early_timestamp(){
+    return EXECUTE_SYSCALL(__NR_esp_log_early_timestamp);
+
+}
 UIRAM_ATTR bool usr_spi_flash_cache_enabled(void)
 {
     // Flash cache will always be enabled in user app.

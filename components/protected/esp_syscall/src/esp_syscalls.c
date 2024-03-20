@@ -2255,6 +2255,9 @@ int sys_get_internal_temperature()
 int sys_add_a_b(int a, int b){
     return a+b;
 }
+uint32_t sys_esp_log_early_timestamp(){
+    return esp_log_early_timestamp();
+}
 
 
 #ifdef CONFIG_ESP_SYSCALL_VERIFY_RETURNED_POINTERS

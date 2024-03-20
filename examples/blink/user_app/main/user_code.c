@@ -92,6 +92,8 @@ void blink_task()
         int b = 2;
         int c = usr_add_a_b(a, b);
         ESP_LOGI(TAG, "Sum of %d and %d is %d", a, b, c);
+        uint32_t t = usr_esp_log_early_timestamp();
+        ESP_LOGI(TAG,"time : %u",t);
 
         gpio_ll_set_level(&GPIO, BLINK_GPIO, 0);
         vTaskDelay(100);
