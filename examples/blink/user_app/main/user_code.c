@@ -35,6 +35,13 @@ temp_sensor_config_t temp_sensor = {
 #define INTR_LED        2
 #define BLINK_GPIO      35
 
+#define SYSCALL         0
+#define NORMAL          1
+
+#define MODE            SYSCALL
+#define MATRIX_SIZE     10
+#define DELAY           50
+
 static int g_state = 0;
 //static usr_gpio_handle_t intr_gpio_handle;
 
@@ -43,82 +50,67 @@ static const char *TAG = "user_main";
 /*
  * matrice of nxn sum function , where n is the size of the matrix a[
  */
-int *usr_syscall_mat_sum(int *a,int *b,int n)
+void usr_syscall_mat_sum(int *a,int *b)
 {
-    int *c = malloc(sizeof(int)*n*n);
+    int n = MATRIX_SIZE;
+    int c[n*n];
     for(int i=0;i<n;i++){
         for(int j=0;j<n;j++){
-            c[i*n+j] = usr_add_a_b(a[i*n+j],b[i*n+j]);
+            c[i*n+j] = usr_add_a_b(1,1);
         }
     }
-    return c;
 }
 
-int *usr_normal_mat_sum(int *a,int *b,int n)
+void usr_normal_mat_sum(int *a,int *b)
 {
-    int *c = malloc(sizeof(int)*n*n);
+    int n = MATRIX_SIZE;
+    int c[n*n];
     for(int i=0;i<n;i++){
         for(int j=0;j<n;j++){
-            c[i*n+j] = a[i*n+j]+b[i*n+j];
+            c[i*n+j] = 1+1;
         }
     }
-    return c;
 }
 /* User space code is never executed in ISR context,
  * so user registered "ISR" functions are actually executed
  * from task's context, hence they are termed as softISRs
  */
-UIRAM_ATTR void user_gpio_softisr(void *arg)
-{
-    int gpio_num = (int)arg;
-    if (g_state == 1) {
-        gpio_ll_set_level(&GPIO, gpio_num, 0);
-        g_state = 0;
-    } else {
-        gpio_ll_set_level(&GPIO, gpio_num, 1);
-        g_state = 1;
-    }
-}
+//UIRAM_ATTR void user_gpio_softisr(void *arg)
+//{
+//    int gpio_num = (int)arg;
+//    if (g_state == 1) {
+//        gpio_ll_set_level(&GPIO, gpio_num, 0);
+//        g_state = 0;
+//    } else {
+//        gpio_ll_set_level(&GPIO, gpio_num, 1);
+//        g_state = 1;
+//    }
+//}
 
 void blink_task()
 {
-
+    int *a1 = malloc(sizeof(int)*MATRIX_SIZE);
+    int *b1 = malloc(sizeof(int)*MATRIX_SIZE);
+    for(int i=0;i<MATRIX_SIZE;i++){
+        a1[i] = i;
+        b1[i] = i;
+    }
 
     while (1) {
-        ESP_LOGI(TAG, "Blinking LED");
-        gpio_ll_set_level(&GPIO, BLINK_GPIO, 1);
-        vTaskDelay(100);
-        int a = 1;
-        int b = 2;
-        int c = usr_add_a_b(a, b);
-        ESP_LOGI(TAG, "Sum of %d and %d is %d", a, b, c);
         uint32_t t = usr_esp_log_early_timestamp();
         ESP_LOGI(TAG,"time : %u",t);
 
-        gpio_ll_set_level(&GPIO, BLINK_GPIO, 0);
-        vTaskDelay(100);
-        int temp = usr_get_internal_temperature();
-        ESP_LOGI(TAG, "Temperature: %d \n", temp);
-        vTaskDelay(100);
-        int *a1 = malloc(sizeof(int)*4);
-        int *b1 = malloc(sizeof(int)*4);
-        for(int i=0;i<4;i++){
-            a1[i] = i;
-            b1[i] = i;
+        if (MODE == NORMAL){
+            ESP_LOGI(TAG, "normal start");
+            usr_normal_mat_sum(a1,b1);
+            ESP_LOGI(TAG, "normal end");
         }
-        int *c1 = usr_normal_mat_sum(a1,b1,2);
-        for(int i=0;i<4;i++){
-            ESP_LOGI(TAG, "Sum of %d and %d is %d", a1[i], b1[i], c1[i]);
+        else if (MODE == SYSCALL){
+            ESP_LOGI(TAG, "syscall start");
+            usr_syscall_mat_sum(a1,b1);
+            ESP_LOGI(TAG, "syscall end");
         }
-        int *c2 = usr_syscall_mat_sum(a1,b1,2);
-        for(int i=0;i<4;i++){
-            ESP_LOGI(TAG, "Sum of %d and %d is %d", a1[i], b1[i], c2[i]);
-        }
-        free(a1);
-        free(b1);
-        free(c1);
-        free(c2);
-
+        vTaskDelay(DELAY);
     }
 }
 
