@@ -10,5 +10,5 @@ set(EXTRA_COMPONENT_DIRS ${CMAKE_CURRENT_LIST_DIR}/../../components/protected
                          ${CMAKE_CURRENT_LIST_DIR}/protected_app)
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
-
+set(CUSTOM_SYSCALL_TBL ${CMAKE_CURRENT_LIST_DIR}/components/user_kernel_pipeline/pipeline_syscall.tbl)
 project(demo)

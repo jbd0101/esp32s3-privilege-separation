@@ -27,6 +27,7 @@
 #include "esp_log.h"
 #include "esp_priv_access.h"
 #include "ws2812.h"
+#include <pipeline_syscall.h>
 //temperature
 #include "driver/i2c.h"
 //builtin temperature sensor
@@ -52,6 +53,7 @@ void app_main()
         ESP_LOGE(TAG, "Failed to initialize PA %d\n", ret);
     }
 
+
     esp_priv_access_set_periph_perm(PA_GPIO, PA_WORLD_1, PA_PERM_ALL);
     //temp_sensor_set_config(temp_sensor);
     //ret = temp_sensor_start();
@@ -64,6 +66,7 @@ void app_main()
 
     for (int i = 0; ; i++) {
        ets_printf("Hello from protected environment\n");
+        sys_esp_kernel_pipeline_push(i);
        //float temp;
         //temp_sensor_read_celsius(&temp);
         //printf("Temperature: %.2f\n", temp);

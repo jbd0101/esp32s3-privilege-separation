@@ -22,10 +22,15 @@ if (NOT DEFSYM_LIST)
     message(FATAL_ERROR "DEFSYM_LIST missing from parent build process")
 endif()
 
-set(USER_APP_BUILD 1)
+    set(USER_APP_BUILD 1)
 
 set(ROOT_DIR ${CMAKE_CURRENT_LIST_DIR}/../../..)
-set(EXTRA_COMPONENT_DIRS ${ROOT_DIR}/components/shared ${ROOT_DIR}/components/shared/drivers ${ROOT_DIR}/components/user/idf_stubs ${ROOT_DIR}/components/user ${CMAKE_CURRENT_LIST_DIR}/../components)
+set(EXTRA_COMPONENT_DIRS
+        ${ROOT_DIR}/components/shared
+        ${ROOT_DIR}/components/shared/drivers
+        ${ROOT_DIR}/components/user/idf_stubs
+        ${ROOT_DIR}/components/user
+        ${CMAKE_CURRENT_LIST_DIR}/../components)
 
 include(${IDF_PATH}/tools/cmake/project.cmake)
 

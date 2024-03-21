@@ -16,7 +16,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "syscall_wrappers.h"
-
+#include "pipeline_syscall.h"
 #include "soc/gpio_struct.h"
 #include "hal/gpio_types.h"
 #include "driver/gpio.h"
@@ -70,6 +70,8 @@ void blink_task()
     while (1) {
         uint32_t t = usr_esp_log_early_timestamp();
         ESP_LOGI(TAG,"time : %u",t);
+        uint32_t eles = usr_esp_kernel_pipeline_data_waiting();
+        ESP_LOGI(TAG,"elements : %u",eles);
         vTaskDelay(DELAY);
     }
 }
@@ -83,6 +85,7 @@ void user_main()
     io_conf.pull_down_en = 0;
     io_conf.pull_up_en = 0;
     gpio_config(&io_conf);
+    usr_esp_kernel_pipeline_init();
 
     usr_start_internal_temperature(&temp_sensor);
     /*
