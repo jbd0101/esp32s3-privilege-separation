@@ -41,8 +41,11 @@ static TaskHandle_t usr_rmaker_dispatcher_task_handle;
 esp_err_t usr_esp_kernel_pipeline_init(){
     return EXECUTE_SYSCALL(__NR_esp_kernel_pipeline_init);
 }
-uint32_t usr_esp_kernel_pipeline_receive(){
-    return EXECUTE_SYSCALL(__NR_esp_kernel_pipeline_receive);
+
+esp_pipeline_packet_t usr_esp_kernel_pipeline_receive() {
+    esp_pipeline_packet_t packet;
+    EXECUTE_SYSCALL(&packet, __NR_esp_kernel_pipeline_receive);
+    return packet;
 }
 uint32_t usr_esp_kernel_pipeline_data_waiting(){
     return EXECUTE_SYSCALL(__NR_esp_kernel_pipeline_data_waiting);

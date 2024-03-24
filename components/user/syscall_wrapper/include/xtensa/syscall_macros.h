@@ -133,3 +133,24 @@ static inline uint32_t __syscall0(uint32_t syscall_num)
 
     return a2;
 }
+static inline uint32_t __buffer_syscall0(uint32_t syscall_num,char *buffer)
+{
+    register uint32_t a0 asm ("a0");
+    register uint32_t a7 asm ("a7") = syscall_num;
+
+        asm volatile ("syscall"
+                : "+r" (a0)
+                : "r" (a7)
+                : "memory");
+    asm volatile (
+            "addi %0, a1,0\n"
+            "addi %1, a2,0\n"
+            "addi %2, a3,0\n"
+            "addi %3, a4,0\n"
+            "addi %4, a5,0\n"
+            :
+            : "r" (buffer[0]), "r" (buffer[1]), "r" (buffer[2]), "r" (buffer[3]), "r" (buffer[4]));
+    return a0;
+
+}
+

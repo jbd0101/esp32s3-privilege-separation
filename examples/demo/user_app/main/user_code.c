@@ -72,6 +72,8 @@ void blink_task()
         ESP_LOGI(TAG,"time : %u",t);
         uint32_t eles = usr_esp_kernel_pipeline_data_waiting();
         ESP_LOGI(TAG,"elements : %u",eles);
+        esp_pipeline_packet_t packet = usr_esp_kernel_pipeline_receive();
+        ESP_LOGI(TAG,"packet : %u",packet.value);
         vTaskDelay(DELAY);
     }
 }

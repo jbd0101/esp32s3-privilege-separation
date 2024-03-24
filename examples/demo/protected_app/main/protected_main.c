@@ -66,7 +66,11 @@ void app_main()
 
     for (int i = 0; ; i++) {
        ets_printf("Hello from protected environment\n");
-        sys_esp_kernel_pipeline_push(i);
+        esp_pipeline_packet_t packet;
+        packet.value = (uint32_t) i;
+        packet.type= ESP_SYSCALL_EVENT_SENSOR2;
+
+        sys_esp_kernel_pipeline_push(packet);
        //float temp;
         //temp_sensor_read_celsius(&temp);
         //printf("Temperature: %.2f\n", temp);

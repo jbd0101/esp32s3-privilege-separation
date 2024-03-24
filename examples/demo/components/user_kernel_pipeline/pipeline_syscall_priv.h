@@ -13,11 +13,14 @@
 // limitations under the License.
 
 #pragma once
+#include "shared_types.h"
+
+/*
 typedef struct {
     uint32_t id;
 } esp_pipeline_packet_t;
 
-/*
+
 typedef enum {
     ESP_SYSCALL_EVENT_RMAKER,
     ESP_SYSCALL_EVENT_BUTTON,

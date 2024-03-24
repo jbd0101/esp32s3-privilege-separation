@@ -15,7 +15,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <freertos/FreeRTOS.h>
-#include <soc_defs.h>
+//#include <soc_defs.h>
+#include "soc_defs.h"
+
 #define true 1
 #define false 0
 
@@ -41,17 +43,29 @@ esp_err_t sys_esp_kernel_pipeline_init(){
     }
     return ESP_OK;
 }
-uint32_t sys_esp_kernel_pipeline_receive(){
-    uint32_t data;
-    if(sys_kernel_pipeline_queue == NULL){
-        ESP_LOGE(TAG, "sys_kernel_pipeline_queue not created");
-        return 0;
+esp_err_t sys_esp_kernel_pipeline_receive(esp_pipeline_packet_t *packet){
+    ESP_LOGI(TAG, "looking for a packet");
+    if(!is_valid_user_d_addr((void *) packet)){
+        ESP_LOGE(TAG, "packet address is not in user space");
+        return false;
     }
-    if(xQueueReceive(sys_kernel_pipeline_queue, &data, portMAX_DELAY) != pdTRUE){
+    if(xQueueReceive(sys_kernel_pipeline_queue, packet, 0) != pdTRUE){
         ESP_LOGE(TAG, "Failed to receive data from sys_kernel_pipeline_queue");
-        return 0;
+        return;
     }
-    return data;
+    ESP_LOGI(TAG, "Received packet with value: %u", packet->value);
+
+    //store buffer in a0,a1,a2,a3,a4
+  /*  asm volatile (
+        "addi a1, %0,0\n"
+        "addi a2, %1,0\n"
+        "addi a3, %2,0\n"
+        "addi a4, %3,0\n"
+        "addi a5, %4,0\n"
+        :
+        : "r" (buffer[0]), "r" (buffer[1]), "r" (buffer[2]), "r" (buffer[3]), "r" (buffer[4])
+    );*/
+    return 1;
 }
 
 uint32_t sys_esp_kernel_pipeline_data_waiting(){
@@ -61,12 +75,12 @@ uint32_t sys_esp_kernel_pipeline_data_waiting(){
     }
     return uxQueueMessagesWaiting(sys_kernel_pipeline_queue);
 }
-esp_err_t sys_esp_kernel_pipeline_push(uint32_t data){
+esp_err_t sys_esp_kernel_pipeline_push(esp_pipeline_packet_t data){
     if(sys_kernel_pipeline_queue == NULL){
         ESP_LOGE(TAG, "sys_kernel_pipeline_queue not created");
         return ESP_FAIL;
     }
-    if(xQueueSend(sys_kernel_pipeline_queue, &data, 0) != pdTRUE){
+        if(xQueueSend(sys_kernel_pipeline_queue, &data, 0) != pdTRUE){
         ESP_LOGE(TAG, "Failed to send data to sys_kernel_pipeline_queue");
         return ESP_FAIL;
     }

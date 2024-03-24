@@ -13,8 +13,10 @@
 // limitations under the License.
 
 #pragma once
+//create a packet type enum
+#include "../shared_types.h"
 
 esp_err_t usr_esp_kernel_pipeline_init();
-uint32_t usr_esp_kernel_pipeline_receive();
+esp_pipeline_packet_t usr_esp_kernel_pipeline_receive();
 uint32_t usr_esp_kernel_pipeline_data_waiting();
-esp_err_t sys_esp_kernel_pipeline_push(uint32_t data);
+esp_err_t sys_esp_kernel_pipeline_push(esp_pipeline_packet_t data);

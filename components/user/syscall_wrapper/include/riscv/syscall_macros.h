@@ -17,7 +17,7 @@
 
 #define GET_MACRO(_1, _2, _3, _4, _5, _6, _7, NAME, ...) NAME
 #define EXECUTE_SYSCALL(...) GET_MACRO(__VA_ARGS__, \
-        __syscall6, __syscall5, __syscall4, __syscall3, __syscall2, __syscall1, __syscall0)(__VA_ARGS__)
+        __syscall6, __syscall5, __syscall4, __syscall3, __syscall2, __syscall1, __syscall0)(__VA_ARGS__) \
 
 static inline uint32_t __syscall6(uint32_t arg0, uint32_t arg1,
                          uint32_t arg2, uint32_t arg3,
@@ -128,4 +128,22 @@ static inline uint32_t __syscall0(uint32_t syscall_num)
               : "memory");
     return a0;
 }
+static inline uint32_t __buffer_syscall0(uint32_t syscall_num,char *buffer)
+{
+    register uint32_t a0 asm ("a0");
+    register uint32_t a7 asm ("a7") = syscall_num;
 
+    asm volatile ("ecall"
+              : "+r" (a0)
+              : "r" (a7)
+              : "memory");
+    asm volatile (
+            "addi %0, %a1,0\n"
+            "addi %1, %a2,0\n"
+            "addi %2, %a3,0\n"
+            "addi %3, %a4,0\n"
+            "addi %4, %a5,0\n"
+    :
+    : "r" (buffer[0]), "r" (buffer[1]), "r" (buffer[2]), "r" (buffer[3]), "r" (buffer[4])
+    return a0;
+}
