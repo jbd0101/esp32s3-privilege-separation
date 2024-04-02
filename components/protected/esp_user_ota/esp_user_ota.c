@@ -262,7 +262,7 @@ esp_err_t esp_user_ota_start(char *url)
     }
 
     if (_user_ota_task_handle == NULL) {
-        xTaskCreate(&user_ota_task, "user_ota_task", USER_OTA_STACK_SIZE, NULL, 5, &_user_ota_task_handle);
+            xTaskCreate(&user_ota_task, "user_ota_task", USER_OTA_STACK_SIZE, NULL, 5, &_user_ota_task_handle);
         if (_user_ota_task_handle == NULL) {
             ESP_LOGE(TAG, "Failed to create user_ota_task");
             xSemaphoreGive(_user_ota_sem);

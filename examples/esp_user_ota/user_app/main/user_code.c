@@ -27,9 +27,11 @@ static const char *TAG = "user_main";
 
 static int _ota_url_handler(int argc, char *argv[])
 {
+    ESP_LOGE(TAG, "argc %d", argc);
     if (argc != 2) {
         return -1;
     }
+    ESP_LOGE(TAG, "Starting OTA from %s, length %d", argv[1], strlen(argv[1]));
     usr_esp_ota_user_app(argv[1], strlen(argv[1]));
     return 0;
 }
@@ -38,7 +40,7 @@ void user_main()
 {
     const esp_console_cmd_t debug_commands = {
         .command = "user-ota",
-        .help = "User OTA URL",
+        .help = "http://192.168.1.32:9000",
         .func = _ota_url_handler,
     };
 
