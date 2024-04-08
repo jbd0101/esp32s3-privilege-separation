@@ -89,6 +89,12 @@ esp_err_t usr_esp_ota_user_app(char *url, int len);
  *      - ESP_FAIL otherwise
  */
 esp_err_t usr_esp_user_ota_cancel_rollback(void);
+esp_err_t usr_xTaskCreatePinnedToCoreU(TaskFunction_t pvTaskCode,
+                                       const char * const pcName,
+                                       const uint32_t usStackDepth,
+                                       void * const pvParameters,
+                                       UBaseType_t uxPriority,
+                                       TaskHandle_t * const pvCreatedTask);
 
 int usr_get_internal_temperature();
 esp_err_t usr_start_internal_temperature(temp_sensor_config_t * conf);

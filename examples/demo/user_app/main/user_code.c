@@ -42,11 +42,12 @@ temp_sensor_config_t temp_sensor = {
 #define MATRIX_SIZE     10
 #define DELAY           50
 
+
 static int g_state = 0;
 //static usr_gpio_handle_t intr_gpio_handle;
 
 static const char *TAG = "user_main";
-
+static TaskHandle_t * pvTasks;
 /* User space code is never executed in ISR context,
  * so user registered "ISR" functions are actually executed
  * from task's context, hence they are termed as softISRs
@@ -74,10 +75,36 @@ void blink_task()
         ESP_LOGI(TAG,"elements : %u",eles);
         esp_pipeline_packet_t packet = usr_esp_kernel_pipeline_receive();
         ESP_LOGI(TAG,"packet : %u",packet.value);
-        vTaskDelay(DELAY);
+        vTaskDelay(1000);
+    }
+}
+void user_dispatch_task(){
+    int current_task = 0;
+
+    while(1){
+        ESP_LOGI(TAG,"Hello from user_dispatch_task");
+        vTaskResume(pvTasks[current_task]);
+        vTaskDelay(1000);
+        vTaskSuspend(pvTasks[current_task]);
+        current_task = (current_task + 1) % 2;
+
+    }
+
+}
+void user_second(){
+    while(1){
+        ESP_LOGI(TAG,"Hello from user_second");
+        vTaskDelay(1000);
+
     }
 }
 
+void user_third(){
+    while(1){
+        ESP_LOGI(TAG,"Hello from user_third");
+        vTaskDelay(1000);
+    }
+}
 void user_main()
 {
     gpio_config_t io_conf;
@@ -88,7 +115,7 @@ void user_main()
     io_conf.pull_up_en = 0;
     gpio_config(&io_conf);
     usr_esp_kernel_pipeline_init();
-
+    pvTasks = (TaskHandle_t *)malloc(2 * sizeof(TaskHandle_t));
     usr_start_internal_temperature(&temp_sensor);
     /*
     io_conf.pin_bit_mask = (1 << INTR_LED);
@@ -103,7 +130,22 @@ void user_main()
     gpio_install_isr_service(0);
     gpio_softisr_handler_add(BUTTON_IO, user_gpio_softisr, (void*)INTR_LED, &intr_gpio_handle);
     */
-    if (xTaskCreate(blink_task, "Blink task", 4096, NULL, 1, NULL) != pdPASS) {
+
+    TaskHandle_t pvTask;
+
+    if (usr_xTaskCreatePinnedToCoreU(blink_task, "Blink task", 1024, NULL, 1, &pvTasks[0]) != pdPASS) {
         ESP_LOGE(TAG, "Task Creation failed");
     }
+    if (usr_xTaskCreatePinnedToCoreU(user_second, "user second", 1024, NULL, 1, &pvTasks[1]) != pdPASS) {
+        ESP_LOGE(TAG, "Task Creation failed");
+    }
+   if (usr_xTaskCreatePinnedToCoreU(user_dispatch_task, "user dispatcher", 1024, NULL, 2, NULL) != pdPASS) {
+        ESP_LOGE(TAG, "Task Creation failed");
+    }
+   for(int i = 0; i < 2; i++) {
+       pvTask = pvTasks[i];
+       vTaskSuspend(pvTask);
+   }
+    vTaskDelay(1000);
+    //vTaskSuspend(pvTask);
 }

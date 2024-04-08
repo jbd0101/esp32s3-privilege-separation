@@ -389,6 +389,7 @@ failure:
     return err;
 }
 
+
 void vPortCleanUpTCB (void *pxTCB)
 {
     if (pvTaskGetThreadLocalStoragePointer(pxTCB, ESP_PA_TLS_OFFSET_KERN_STACK) == NULL) {

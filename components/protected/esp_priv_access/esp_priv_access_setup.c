@@ -516,6 +516,8 @@ static void user_boot_task(void *args)
     user_boot_status_t *boot_status = (user_boot_status_t *)args;
     esp_image_metadata_t user_img_data = {0};
     esp_err_t ret = esp_priv_access_user_unpack(&user_img_data);
+
+    ///jchchhchc
     if (ret == ESP_OK) {
         void *user_entry = (void *)user_img_data.image.entry_addr;
         ret = esp_priv_access_user_set_entry(user_entry);
