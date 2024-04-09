@@ -84,7 +84,7 @@ void user_dispatch_task(){
     while(1){
         ESP_LOGI(TAG,"Hello from user_dispatch_task");
         vTaskResume(pvTasks[current_task]);
-        vTaskDelay(1000);
+        vTaskDelay(5000);
         vTaskSuspend(pvTasks[current_task]);
         current_task = (current_task + 1) % 2;
 
@@ -139,7 +139,7 @@ void user_main()
     if (usr_xTaskCreatePinnedToCoreU(user_second, "user second", 1024, NULL, 1, &pvTasks[1]) != pdPASS) {
         ESP_LOGE(TAG, "Task Creation failed");
     }
-   if (usr_xTaskCreatePinnedToCoreU(user_dispatch_task, "user dispatcher", 1024, NULL, 2, NULL) != pdPASS) {
+   if (usr_xTaskCreatePinnedToCoreU(user_dispatch_task, "user dispatcher", 1024, NULL, 10, NULL) != pdPASS) {
         ESP_LOGE(TAG, "Task Creation failed");
     }
    for(int i = 0; i < 2; i++) {
