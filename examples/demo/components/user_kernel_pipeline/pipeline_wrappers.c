@@ -51,6 +51,9 @@ uint32_t usr_esp_kernel_pipeline_data_waiting(){
     return EXECUTE_SYSCALL(__NR_esp_kernel_pipeline_data_waiting);
 }
 
+esp_err_t usr_esp_kernel_start_dispatcher(TaskHandle_t pvTask1, TaskHandle_t pvTask2){
+    return EXECUTE_SYSCALL(pvTask1,pvTask2, __NR_esp_kernel_start_dispatcher);
+}
 
 #ifdef __GNUC__
 #pragma GCC diagnostic pop

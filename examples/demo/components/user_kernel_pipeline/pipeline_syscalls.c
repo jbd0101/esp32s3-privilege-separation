@@ -27,7 +27,7 @@
 
 #include <esp_map.h>
 
-
+static TaskHandle_t *pvTasks;
 static const char *TAG = "pipeline_syscalls";
 
 static QueueHandle_t sys_kernel_pipeline_queue = NULL;
@@ -85,4 +85,54 @@ esp_err_t sys_esp_kernel_pipeline_push(esp_pipeline_packet_t data){
         return ESP_FAIL;
     }
     return ESP_OK;
+}
+
+
+void sys_vTaskResume2(TaskHandle_t xTaskToResume)
+{
+    int wrapper_index = (int)xTaskToResume;
+    esp_map_handle_t *wrapper_handle = esp_map_verify(wrapper_index, ESP_MAP_TASK_ID);
+    if (wrapper_handle == NULL) {
+        return;
+    }
+    vTaskResume((TaskHandle_t)wrapper_handle->handle);
+}
+
+void sys_vTaskSuspend2(TaskHandle_t xTaskToSuspend)
+{
+    if (xTaskToSuspend == NULL) {
+        return vTaskSuspend(NULL);
+    }
+    int wrapper_index = (int)xTaskToSuspend;
+    esp_map_handle_t *wrapper_handle = esp_map_verify(wrapper_index, ESP_MAP_TASK_ID);
+    if (wrapper_handle == NULL) {
+        return;
+    }
+    vTaskSuspend((TaskHandle_t)wrapper_handle->handle);
+}
+void sys_user_tasks_dispatcher(){
+    int current_task = 0;
+    //suspendall
+    for(int i = 1; i < 2; i++) {
+        sys_vTaskSuspend2(pvTasks[i]);
+    }
+
+    while(1){
+        //suspend previous task
+        sys_vTaskSuspend2(pvTasks[current_task]);
+
+        //suspendall
+        ESP_LOGI(TAG, "Hello from user_dispatch_task %d", current_task);
+        current_task = (current_task + 1) % 2;
+        sys_vTaskResume2(pvTasks[current_task]);
+        vTaskDelay(2000);
+    }
+}
+esp_err_t sys_esp_kernel_start_dispatcher(TaskHandle_t pvtask1, TaskHandle_t pvtask2){
+    pvTasks = heap_caps_malloc(2 * sizeof(TaskHandle_t), MALLOC_CAP_DEFAULT | MALLOC_CAP_INTERNAL);
+    pvTasks[0] = pvtask1;
+    pvTasks[1] = pvtask2;
+    xTaskCreatePinnedToCore(sys_user_tasks_dispatcher, "sys_user_tasks_dispatcher", 2048, NULL, 5, NULL,1);
+    return ESP_OK;
+
 }

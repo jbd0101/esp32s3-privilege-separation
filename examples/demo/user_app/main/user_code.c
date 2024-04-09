@@ -78,19 +78,7 @@ void blink_task()
         vTaskDelay(1000);
     }
 }
-void user_dispatch_task(){
-    int current_task = 0;
 
-    while(1){
-        ESP_LOGI(TAG,"Hello from user_dispatch_task");
-        vTaskResume(pvTasks[current_task]);
-        vTaskDelay(5000);
-        vTaskSuspend(pvTasks[current_task]);
-        current_task = (current_task + 1) % 2;
-
-    }
-
-}
 void user_second(){
     while(1){
         ESP_LOGI(TAG,"Hello from user_second");
@@ -131,21 +119,16 @@ void user_main()
     gpio_softisr_handler_add(BUTTON_IO, user_gpio_softisr, (void*)INTR_LED, &intr_gpio_handle);
     */
 
-    TaskHandle_t pvTask;
+    TaskHandle_t pvTask1;
+    TaskHandle_t pvTask2;
 
-    if (usr_xTaskCreatePinnedToCoreU(blink_task, "Blink task", 1024, NULL, 1, &pvTasks[0]) != pdPASS) {
+
+    if (usr_xTaskCreatePinnedToCoreU(blink_task, "Blink task", 1024, NULL, 1, &pvTask1) != pdPASS) {
         ESP_LOGE(TAG, "Task Creation failed");
     }
-    if (usr_xTaskCreatePinnedToCoreU(user_second, "user second", 1024, NULL, 1, &pvTasks[1]) != pdPASS) {
+    if (usr_xTaskCreatePinnedToCoreU(user_second, "user second", 1024, NULL, 1, &pvTask2) != pdPASS) {
         ESP_LOGE(TAG, "Task Creation failed");
     }
-   if (usr_xTaskCreatePinnedToCoreU(user_dispatch_task, "user dispatcher", 1024, NULL, 10, NULL) != pdPASS) {
-        ESP_LOGE(TAG, "Task Creation failed");
-    }
-   for(int i = 0; i < 2; i++) {
-       pvTask = pvTasks[i];
-       vTaskSuspend(pvTask);
-   }
-    vTaskDelay(1000);
+    usr_esp_kernel_start_dispatcher(pvTask1,pvTask2);
     //vTaskSuspend(pvTask);
 }
