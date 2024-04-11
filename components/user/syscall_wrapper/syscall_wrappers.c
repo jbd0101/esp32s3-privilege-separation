@@ -213,7 +213,7 @@ BaseType_t usr_xTaskCreatePinnedToCore(TaskFunction_t pvTaskCode,
 
     return ret;
 }
-BaseType_t usr_xTaskCreatePinnedToCoreU(TaskFunction_t pvTaskCode,
+usr_task_ctx_t* usr_xTaskCreatePinnedToCoreU(TaskFunction_t pvTaskCode,
                                        const char * const pcName,
                                        const uint32_t usStackDepth,
                                        void * const pvParameters,
@@ -223,29 +223,29 @@ BaseType_t usr_xTaskCreatePinnedToCoreU(TaskFunction_t pvTaskCode,
     const BaseType_t xCoreID = 0;
     ESP_LOGE("SW","TASK %s",pcName);
     int ret;
-    usr_task_ctx_t task_ctx;
-    task_ctx.stack = heap_caps_malloc(usStackDepth, MALLOC_CAP_DEFAULT);
-    if (task_ctx.stack == NULL) {
-        return -1;
+    usr_task_ctx_t *task_ctx = (usr_task_ctx_t *) malloc(sizeof(usr_task_ctx_t));
+    task_ctx->stack = heap_caps_malloc(usStackDepth, MALLOC_CAP_DEFAULT);
+    if (task_ctx->stack == NULL) {
+        return NULL;
     }
 
-    task_ctx.task_errno = heap_caps_malloc(sizeof(int), MALLOC_CAP_DEFAULT);
-    if (task_ctx.task_errno == NULL) {
-        free(task_ctx.stack);
-        return -1;
+    task_ctx->task_errno = heap_caps_malloc(sizeof(int), MALLOC_CAP_DEFAULT);
+    if (task_ctx->task_errno == NULL) {
+        free(task_ctx->stack);
+        return NULL;
     }
-    task_ctx.task_handle = pvCreatedTask;
-    task_ctx.stack_size = usStackDepth;
+    task_ctx->task_handle = pvCreatedTask;
+    task_ctx->stack_size = usStackDepth;
 
     // We don't support more than 6 arguments for a system call, so to pass more arguments, we use usr_task_ctx_t struct
-    ret = EXECUTE_SYSCALL(pvTaskCode, pcName, pvParameters, uxPriority, xCoreID, &task_ctx, __NR_xTaskCreatePinnedToCore);
+    ret = EXECUTE_SYSCALL(pvTaskCode, pcName, pvParameters, uxPriority, xCoreID, task_ctx, __NR_xTaskCreatePinnedToCore);
 
     if (ret != pdPASS) {
-        free(task_ctx.stack);
-        free(task_ctx.task_errno);
+        free(task_ctx->stack);
+        free(task_ctx->task_errno);
     }
 
-    return ret;
+    return task_ctx;
 }
 
 void usr_vTaskDelete(TaskHandle_t TaskHandle)

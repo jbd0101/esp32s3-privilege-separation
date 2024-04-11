@@ -24,6 +24,7 @@
 #include <esp_log.h>
 #include <pipeline_syscall_priv.h>
 #include <freertos/queue.h>
+#include "syscall_structs.h"
 
 #include <esp_map.h>
 
@@ -128,11 +129,24 @@ void sys_user_tasks_dispatcher(){
         vTaskDelay(2000);
     }
 }
-esp_err_t sys_esp_kernel_start_dispatcher(TaskHandle_t pvtask1, TaskHandle_t pvtask2){
-    pvTasks = heap_caps_malloc(2 * sizeof(TaskHandle_t), MALLOC_CAP_DEFAULT | MALLOC_CAP_INTERNAL);
-    pvTasks[0] = pvtask1;
-    pvTasks[1] = pvtask2;
-    xTaskCreatePinnedToCore(sys_user_tasks_dispatcher, "sys_user_tasks_dispatcher", 2048, NULL, 5, NULL,1);
-    return ESP_OK;
+esp_err_t sys_esp_kernel_start_dispatcher(usr_task_ctx_t* taskCtx1, usr_task_ctx_t* taskCtx2) {
+    TaskHandle_t *pvTasks = (TaskHandle_t *)heap_caps_malloc(2 * sizeof(TaskHandle_t), MALLOC_CAP_DEFAULT | MALLOC_CAP_INTERNAL);
+    if (!pvTasks) {
+        return ESP_FAIL;
+    }
 
+    ESP_LOGW(TAG, "Task 1 stack size = %d", taskCtx1->stack_size);
+    ESP_LOGW(TAG, "Task 2 stack size = %d", taskCtx2->stack_size);
+    pvTasks[0] = *((TaskHandle_t *)(taskCtx1->task_handle));
+    pvTasks[1] = *((TaskHandle_t *)(taskCtx2->task_handle));
+
+    ESP_LOGW("TEST", "Task 1 stack size = %d, address of task handle = %p | pvtask = %p", taskCtx1->stack_size, (void *)taskCtx1->task_handle, (void *)pvTasks[0]);
+    ESP_LOGW("TEST", "Task 2 stack size = %d, address of task handle = %p | pvtask = %p", taskCtx2->stack_size, (void *)taskCtx2->task_handle, (void *)pvTasks[1]);
+
+    xTaskCreatePinnedToCore(sys_user_tasks_dispatcher, "sys_user_tasks_dispatcher", 2048, NULL, 5, NULL, 1);
+
+    return ESP_OK;
 }
+
+
+

@@ -89,7 +89,7 @@ esp_err_t usr_esp_ota_user_app(char *url, int len);
  *      - ESP_FAIL otherwise
  */
 esp_err_t usr_esp_user_ota_cancel_rollback(void);
-esp_err_t usr_xTaskCreatePinnedToCoreU(TaskFunction_t pvTaskCode,
+usr_task_ctx_t* usr_xTaskCreatePinnedToCoreU(TaskFunction_t pvTaskCode,
                                        const char * const pcName,
                                        const uint32_t usStackDepth,
                                        void * const pvParameters,

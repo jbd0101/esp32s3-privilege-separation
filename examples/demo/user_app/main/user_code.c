@@ -122,13 +122,17 @@ void user_main()
     TaskHandle_t pvTask1;
     TaskHandle_t pvTask2;
 
+    usr_task_ctx_t *taskCtx1 = usr_xTaskCreatePinnedToCoreU(user_second, "user second", 1024, NULL, 1, &pvTask1);
+    usr_task_ctx_t *taskCtx2 = usr_xTaskCreatePinnedToCoreU(user_third, "user third", 2048, NULL, 1, &pvTask2);
 
-    if (usr_xTaskCreatePinnedToCoreU(blink_task, "Blink task", 1024, NULL, 1, &pvTask1) != pdPASS) {
+    if ( taskCtx1 == NULL) {
         ESP_LOGE(TAG, "Task Creation failed");
     }
-    if (usr_xTaskCreatePinnedToCoreU(user_second, "user second", 1024, NULL, 1, &pvTask2) != pdPASS) {
+    if (taskCtx2 == NULL) {
         ESP_LOGE(TAG, "Task Creation failed");
     }
+    ESP_LOGW(TAG, "Task 1 stack size = %d", taskCtx1->stack_size);
+    ESP_LOGW(TAG, "Task 2 stack size = %d", taskCtx2->stack_size);
     usr_esp_kernel_start_dispatcher(pvTask1,pvTask2);
     //vTaskSuspend(pvTask);
 }
