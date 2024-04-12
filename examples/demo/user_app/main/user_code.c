@@ -80,16 +80,20 @@ void blink_task()
 }
 
 void user_second(){
+    int i = 0;
     while(1){
-        ESP_LOGI(TAG,"Hello from user_second");
-        vTaskDelay(1000);
+        ESP_LOGI(TAG,"Hello from user_second %d",i);
+        i++;
+        vTaskDelay(200);
 
     }
 }
 
 void user_third(){
+    int i = 0;
     while(1){
-        ESP_LOGI(TAG,"Hello from user_third");
+        ESP_LOGI(TAG,"Hello from user_third %d",i);
+        i++;
         vTaskDelay(1000);
     }
 }
@@ -123,7 +127,7 @@ void user_main()
     TaskHandle_t pvTask2;
 
     usr_task_ctx_t *taskCtx1 = usr_xTaskCreatePinnedToCoreU(user_second, "user second", 1024, NULL, 1, &pvTask1);
-    usr_task_ctx_t *taskCtx2 = usr_xTaskCreatePinnedToCoreU(user_third, "user third", 2048, NULL, 1, &pvTask2);
+    usr_task_ctx_t *taskCtx2 = usr_xTaskCreatePinnedToCoreU(user_third, "user third", 1024, NULL, 1, &pvTask2);
 
     if ( taskCtx1 == NULL) {
         ESP_LOGE(TAG, "Task Creation failed");
