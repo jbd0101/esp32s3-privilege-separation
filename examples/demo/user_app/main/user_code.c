@@ -131,8 +131,10 @@ void user_main()
     if (taskCtx2 == NULL) {
         ESP_LOGE(TAG, "Task Creation failed");
     }
+    ESP_LOGI(TAG,"Task 1 , taskhandler : %p",pvTask1);
+    ESP_LOGI(TAG,"Task 2 , taskhandler : %p",pvTask2);
     ESP_LOGW(TAG, "Task 1 stack size = %d", taskCtx1->stack_size);
     ESP_LOGW(TAG, "Task 2 stack size = %d", taskCtx2->stack_size);
-    usr_esp_kernel_start_dispatcher(pvTask1,pvTask2);
+    usr_esp_kernel_start_dispatcher(taskCtx1,taskCtx2);
     //vTaskSuspend(pvTask);
 }

@@ -111,17 +111,29 @@ void sys_vTaskSuspend2(TaskHandle_t xTaskToSuspend)
     }
     vTaskSuspend((TaskHandle_t)wrapper_handle->handle);
 }
+
+TaskHandle_t sys_get_task_handle(TaskHandle_t xTask){
+    int wrapper_index = (int)xTask;
+    esp_map_handle_t *wrapper_handle = esp_map_verify(wrapper_index, ESP_MAP_TASK_ID);
+    if (wrapper_handle == NULL) {
+        return;
+    }
+    return (TaskHandle_t)wrapper_handle->handle;
+
+}
 void sys_user_tasks_dispatcher(){
     int current_task = 0;
     //suspendall
     for(int i = 1; i < 2; i++) {
+        ESP_LOGI(TAG, "Suspending task %p", pvTasks[i]);
         sys_vTaskSuspend2(pvTasks[i]);
     }
 
     while(1){
         //suspend previous task
         sys_vTaskSuspend2(pvTasks[current_task]);
-
+        //TaskHandle_t handler = sys_get_task_handle(pvTasks[current_task]);
+        ///
         //suspendall
         ESP_LOGI(TAG, "Hello from user_dispatch_task %d", current_task);
         current_task = (current_task + 1) % 2;
@@ -130,7 +142,7 @@ void sys_user_tasks_dispatcher(){
     }
 }
 esp_err_t sys_esp_kernel_start_dispatcher(usr_task_ctx_t* taskCtx1, usr_task_ctx_t* taskCtx2) {
-    TaskHandle_t *pvTasks = (TaskHandle_t *)heap_caps_malloc(2 * sizeof(TaskHandle_t), MALLOC_CAP_DEFAULT | MALLOC_CAP_INTERNAL);
+    pvTasks = (TaskHandle_t *)heap_caps_malloc(2 * sizeof(TaskHandle_t), MALLOC_CAP_DEFAULT | MALLOC_CAP_INTERNAL);
     if (!pvTasks) {
         return ESP_FAIL;
     }
@@ -139,9 +151,9 @@ esp_err_t sys_esp_kernel_start_dispatcher(usr_task_ctx_t* taskCtx1, usr_task_ctx
     ESP_LOGW(TAG, "Task 2 stack size = %d", taskCtx2->stack_size);
     pvTasks[0] = *((TaskHandle_t *)(taskCtx1->task_handle));
     pvTasks[1] = *((TaskHandle_t *)(taskCtx2->task_handle));
-
-    ESP_LOGW("TEST", "Task 1 stack size = %d, address of task handle = %p | pvtask = %p", taskCtx1->stack_size, (void *)taskCtx1->task_handle, (void *)pvTasks[0]);
-    ESP_LOGW("TEST", "Task 2 stack size = %d, address of task handle = %p | pvtask = %p", taskCtx2->stack_size, (void *)taskCtx2->task_handle, (void *)pvTasks[1]);
+    TaskHandle_t pvTask1 = pvTasks[0];
+    ESP_LOGW("TEST", "Task 1 stack size = %d, address of task handle = %p | pvtask = %p", taskCtx1->stack_size, (void *)taskCtx1->task_handle, pvTasks[0]);
+    ESP_LOGW("TEST", "Task 2 stack size = %d, address of task handle = %p | pvtask = %p", taskCtx2->stack_size, (void *)taskCtx2->task_handle, pvTasks[1]);
 
     xTaskCreatePinnedToCore(sys_user_tasks_dispatcher, "sys_user_tasks_dispatcher", 2048, NULL, 5, NULL, 1);
 
