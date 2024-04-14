@@ -150,22 +150,25 @@ void sys_user_tasks_dispatcher(){
     // wait 1 second
     // copy buffer to task 0 stack
     // start task 0
-    int i = 0;
-    sys_vTaskSuspend2(pvTasks[i]);
-    //sys_vTaskSuspend2(pvTasks[1]);
-    vTaskDelay(1000);
-    while(1){
-        sys_vTaskResume2(pvTasks[i]);
-        vTaskDelay(1000);
+    int task_index = 0;
+    for(int i = 0; i < 2; i++) {
         sys_vTaskSuspend2(pvTasks[i]);
-        ESP_LOGI(TAG, "Suspending task %p", pvTasks[i]);
-        //copy stack to buffer
-        memcpy(sleeping_task_stack, tskCtxs[i].stack, tskCtxs[i].stack_size);
-        //memset stack
-        memset(tskCtxs[i].stack, 0, tskCtxs[i].stack_size);
-        vTaskDelay(1000);
+    }
+    // lets copy the stack of index1 to the buffer
+    memcpy(sleeping_task_stack, tskCtxs[1].stack, tskCtxs[1].stack_size);
+    memset(tskCtxs[1].stack, 0, tskCtxs[1].stack_size);
+    while(1){
+        sys_vTaskResume2(pvTasks[task_index]);
+        vTaskDelay(2000);
+        sys_vTaskSuspend2(pvTasks[task_index]);
+        ESP_LOGI(TAG, "Suspending task %p", pvTasks[task_index]);
         //copy buffer to stack
-        memcpy(tskCtxs[i].stack, sleeping_task_stack, tskCtxs[i].stack_size);
+        memcpy(tskCtxs[(task_index+1)%2].stack, sleeping_task_stack, tskCtxs[(task_index+1)%2].stack_size);
+        //copy stack to buffer
+        memcpy(sleeping_task_stack, tskCtxs[task_index].stack, tskCtxs[task_index].stack_size);
+        //memset stack
+        memset(tskCtxs[task_index].stack, 0, tskCtxs[task_index].stack_size);
+        task_index = (task_index + 1) % 2;
 
 
 

@@ -94,7 +94,7 @@ void user_third(){
     while(1){
         ESP_LOGI(TAG,"Hello from user_third %d",i);
         i++;
-        vTaskDelay(1000);
+        vTaskDelay(200);
     }
 }
 void user_main()
