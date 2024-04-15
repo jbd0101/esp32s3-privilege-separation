@@ -127,7 +127,10 @@ void user_main()
     TaskHandle_t pvTask2;
 
     usr_task_ctx_t *taskCtx1 = usr_xTaskCreatePinnedToCoreU(user_second, "user second", 1024, NULL, 1, &pvTask1);
+    vTaskSuspend(pvTask1);
+    usr_save_task_ctx(taskCtx1);
     usr_task_ctx_t *taskCtx2 = usr_xTaskCreatePinnedToCoreU(user_third, "user third", 1024, NULL, 1, &pvTask2);
+    vTaskSuspend(pvTask2);
 
     if ( taskCtx1 == NULL) {
         ESP_LOGE(TAG, "Task Creation failed");
@@ -140,5 +143,4 @@ void user_main()
     ESP_LOGW(TAG, "Task 1 stack size = %d", taskCtx1->stack_size);
     ESP_LOGW(TAG, "Task 2 stack size = %d", taskCtx2->stack_size);
     usr_esp_kernel_start_dispatcher(taskCtx1,taskCtx2);
-    //vTaskSuspend(pvTask);
 }

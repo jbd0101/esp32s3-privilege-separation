@@ -49,7 +49,7 @@
 #endif
 
 static bool _is_heap_initialized;
-
+static StackType_t * shared_stack = NULL;
 #ifdef __GNUC__
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wint-conversion"
@@ -224,7 +224,11 @@ usr_task_ctx_t* usr_xTaskCreatePinnedToCoreU(TaskFunction_t pvTaskCode,
     ESP_LOGE("SW","TASK %s",pcName);
     int ret;
     usr_task_ctx_t *task_ctx = (usr_task_ctx_t *) malloc(sizeof(usr_task_ctx_t));
-    task_ctx->stack = heap_caps_malloc(usStackDepth, MALLOC_CAP_DEFAULT);
+    if(shared_stack == NULL){
+        shared_stack = heap_caps_malloc(usStackDepth, MALLOC_CAP_DEFAULT);
+    }
+    task_ctx->stack = shared_stack;
+
     if (task_ctx->stack == NULL) {
         return NULL;
     }

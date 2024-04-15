@@ -3,3 +3,4 @@
 1282  custom  esp_kernel_pipeline_receive                sys_esp_kernel_pipeline_receive
 1283  custom  esp_kernel_pipeline_data_waiting           sys_esp_kernel_pipeline_data_waiting
 1284  custom  esp_kernel_start_dispatcher                sys_esp_kernel_start_dispatcher
+1285  custom  esp_save_task_ctx                          sys_save_task_ctx
