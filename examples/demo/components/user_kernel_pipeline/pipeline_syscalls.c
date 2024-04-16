@@ -15,6 +15,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <freertos/FreeRTOS.h>
+#include "nvs_flash.h"
+
 //#include <soc_defs.h>
 #include "soc_defs.h"
 
@@ -33,7 +35,7 @@ static usr_task_ctx_t *tskCtxs;
 static StackType_t * sleeping_task_stack1;
 static StackType_t * sleeping_task_stack2;
 static const char *TAG = "pipeline_syscalls";
-
+static int task_index = 0;
 static QueueHandle_t sys_kernel_pipeline_queue = NULL;
 esp_err_t sys_esp_kernel_pipeline_init(){
     if(sys_kernel_pipeline_queue == NULL){
@@ -128,7 +130,6 @@ TaskHandle_t sys_get_task_handle(TaskHandle_t xTask){
 // tache1, tache2, et tache 3 => stack_user
 // kernel stack_kernel_temporaire
 void sys_user_tasks_dispatcher(){
-    int current_task = 0;
     //suspendall
     /*for(int i = 1; i < 2; i++) {
         ESP_LOGI(TAG, "Suspending task %p", pvTasks[i]);
@@ -154,7 +155,7 @@ void sys_user_tasks_dispatcher(){
     // wait 1 second
     // copy buffer to task 0 stack
     // start task 0
-    int task_index = 1;
+    task_index = 1;
    // for(int i = 0; i < 2; i++) {
    //     sys_vTaskSuspend2(pvTasks[i]);
     //}
@@ -200,7 +201,6 @@ esp_err_t sys_esp_kernel_start_dispatcher(usr_task_ctx_t* taskCtx1, usr_task_ctx
     pvTasks[1] = *((TaskHandle_t *)(taskCtx2->task_handle));
     tskCtxs[0] = *taskCtx1;
     tskCtxs[1] = *taskCtx2;
-    TaskHandle_t pvTask1 = pvTasks[0];
     ESP_LOGW("TEST", "Task 1 stack size = %d, address of task handle = %p | pvtask = %p", taskCtx1->stack_size, (void *)taskCtx1->task_handle, pvTasks[0]);
     ESP_LOGW("TEST", "Task 2 stack size = %d, address of task handle = %p | pvtask = %p", taskCtx2->stack_size, (void *)taskCtx2->task_handle, pvTasks[1]);
     //mallocing the stack for the sleeping task
@@ -214,4 +214,26 @@ esp_err_t sys_save_task_ctx(usr_task_ctx_t *task_ctx){
     sleeping_task_stack2 = heap_caps_malloc(task_ctx->stack_size, MALLOC_CAP_DEFAULT | MALLOC_CAP_INTERNAL);
     memcpy(sleeping_task_stack1,task_ctx->stack, task_ctx->stack_size);
     return true;
+}
+esp_err_t sys_get_uint32_secret(char *key, uint32_t *value){
+    //
+    nvs_handle_t handler;
+    if(task_index == 0){
+        if(nvs_open_from_partition("static_data", "task1", NVS_READWRITE, &handler) != ESP_OK){
+            ESP_LOGE(TAG, "Failed to open nvs partition");
+            return ESP_FAIL;
+        }
+    }else{
+        if(nvs_open_from_partition("static_data", "task2", NVS_READWRITE, &handler) != ESP_OK){
+            ESP_LOGE(TAG, "Failed to open nvs partition");
+            return ESP_FAIL;
+        }
+    }
+    if(nvs_get_u32(handler, key, value) != ESP_OK){
+        ESP_LOGE(TAG, "Failed to get value from nvs");
+        return ESP_FAIL;
+    }
+    //close nvs
+    nvs_close(handler);
+    return ESP_OK;
 }

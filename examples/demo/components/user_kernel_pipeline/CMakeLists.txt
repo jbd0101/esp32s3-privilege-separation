@@ -8,7 +8,7 @@ idf_component_register(
     SRCS ${srcs}
     INCLUDE_DIRS include
     PRIV_INCLUDE_DIRS .
-    REQUIRES syscall_shared esp_priv_build_utils
+    REQUIRES syscall_shared esp_priv_build_utils nvs_flash
     )
 
 if(NOT USER_APP_BUILD)

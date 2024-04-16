@@ -82,7 +82,9 @@ void blink_task()
 void user_second(){
     int i = 0;
     while(1){
-        ESP_LOGI(TAG,"Hello from user_second %d",i);
+        uint32_t key1;
+        usr_get_uint32_secret("key1",&key1);
+        ESP_LOGI(TAG,"Hello from user_second %d - secret key1 : %u",i,key1);
         i++;
         vTaskDelay(200);
 
@@ -92,7 +94,9 @@ void user_second(){
 void user_third(){
     int i = 0;
     while(1){
-        ESP_LOGI(TAG,"Hello from user_third %d",i);
+        uint32_t key1;
+        usr_get_uint32_secret("key1",&key1);
+        ESP_LOGI(TAG,"Hello from user_second %d - secret key1 : %u",i,key1);
         i++;
         vTaskDelay(200);
     }
