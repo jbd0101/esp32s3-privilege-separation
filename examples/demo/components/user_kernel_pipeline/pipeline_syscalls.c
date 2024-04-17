@@ -32,11 +32,15 @@
 
 static TaskHandle_t *pvTasks;
 static usr_task_ctx_t *tskCtxs;
-static StackType_t * sleeping_task_stack1;
-static StackType_t * sleeping_task_stack2;
+//static StackType_t * sleeping_task_stack1;
+//static StackType_t * sleeping_task_stack2;
 static const char *TAG = "pipeline_syscalls";
 static int task_index = 0;
 static QueueHandle_t sys_kernel_pipeline_queue = NULL;
+
+static int n_tasks = 0;
+static StackType_t ** sleeping_task_stacks;
+
 esp_err_t sys_esp_kernel_pipeline_init(){
     if(sys_kernel_pipeline_queue == NULL){
         sys_kernel_pipeline_queue = xQueueCreate(10, sizeof(uint32_t));
@@ -155,7 +159,7 @@ void sys_user_tasks_dispatcher(){
     // wait 1 second
     // copy buffer to task 0 stack
     // start task 0
-    task_index = 1;
+    task_index = n_tasks-1;
    // for(int i = 0; i < 2; i++) {
    //     sys_vTaskSuspend2(pvTasks[i]);
     //}
@@ -168,34 +172,45 @@ void sys_user_tasks_dispatcher(){
         vTaskDelay(2000);
         sys_vTaskSuspend2(pvTasks[task_index]);
         ESP_LOGI(TAG, "Suspending task %p", pvTasks[task_index]);
-         if(task_index ==0){
-             /// on est a la stack 0, copions la
-             memcpy(sleeping_task_stack1,tskCtxs[0].stack, tskCtxs[0].stack_size);
-             /// copy back sleeping_task_stack2 to stack 1
-             memcpy(tskCtxs[1].stack, sleeping_task_stack2, tskCtxs[1].stack_size);
-         }else{
-                memcpy(sleeping_task_stack2,tskCtxs[1].stack, tskCtxs[1].stack_size);
-                memcpy(tskCtxs[0].stack, sleeping_task_stack1, tskCtxs[0].stack_size);
-         }
+        int next = (task_index + 1) % n_tasks;
+        int current = task_index;
+        memcpy(sleeping_task_stacks[current],tskCtxs[current].stack, tskCtxs[current].stack_size);
+        memcpy(tskCtxs[next].stack, sleeping_task_stacks[next], tskCtxs[next].stack_size);
+//        if(task_index ==0){
+//             /// on est a la stack 0, copions la
+//             memcpy(sleeping_task_stacks[0],tskCtxs[0].stack, tskCtxs[0].stack_size);
+//             /// copy back sleeping_task_stack2 to stack 1
+//             memcpy(tskCtxs[1].stack, sleeping_task_stacks[1], tskCtxs[1].stack_size);
+//         }else{
+//                memcpy(sleeping_task_stacks[1],tskCtxs[1].stack, tskCtxs[1].stack_size);
+//                memcpy(tskCtxs[0].stack, sleeping_task_stacks[0], tskCtxs[0].stack_size);
+//         }
         //memset stack
         //memset(tskCtxs[task_index].stack, 0, tskCtxs[task_index].stack_size);
-        task_index = (task_index + 1) % 2;
-
-
+        task_index = next;
 
     }
 
 
 
 }
-esp_err_t sys_esp_kernel_start_dispatcher(usr_task_ctx_t** taskCtx) {
-    int n_tasks = 2;
+esp_err_t sys_esp_kernel_start_dispatcher(usr_task_ctx_t** taskCtx, int n) {
+    n_tasks = n;
     pvTasks = (TaskHandle_t *)heap_caps_malloc(n_tasks * sizeof(TaskHandle_t), MALLOC_CAP_DEFAULT | MALLOC_CAP_INTERNAL);
     tskCtxs = (usr_task_ctx_t *)heap_caps_malloc(n_tasks * sizeof(usr_task_ctx_t), MALLOC_CAP_DEFAULT | MALLOC_CAP_INTERNAL);
+    sleeping_task_stacks = (StackType_t **)heap_caps_malloc(n_tasks * sizeof(StackType_t *), MALLOC_CAP_DEFAULT | MALLOC_CAP_INTERNAL);
     if (!pvTasks) {
         return ESP_FAIL;
     }
     for (int i = 0; i < n_tasks; ++i) {
+        sleeping_task_stacks[i] = heap_caps_malloc(taskCtx[i]->stack_size, MALLOC_CAP_DEFAULT | MALLOC_CAP_INTERNAL);
+        if (!sleeping_task_stacks[i]) {
+            return ESP_FAIL;
+        }
+        if (i == n_tasks- 1) {
+            memcpy(sleeping_task_stacks[0], taskCtx[i]->stack, taskCtx[i]->stack_size);
+        }
+
         ESP_LOGW(TAG, "Task %d stack size = %d", i, taskCtx[i]->stack_size);
         pvTasks[i] = *((TaskHandle_t *)(taskCtx[i]->task_handle));
         tskCtxs[i] = *taskCtx[i];
@@ -213,11 +228,16 @@ esp_err_t sys_esp_kernel_start_dispatcher(usr_task_ctx_t** taskCtx) {
     xTaskCreatePinnedToCore(sys_user_tasks_dispatcher, "sys_user_tasks_dispatcher", 2048, NULL, 5, NULL, 1);
     return ESP_OK;
 }
+
 esp_err_t sys_save_task_ctx(usr_task_ctx_t *task_ctx){
     // copy taskCtx stack to a buffer
-    sleeping_task_stack1 = heap_caps_malloc(task_ctx->stack_size, MALLOC_CAP_DEFAULT | MALLOC_CAP_INTERNAL);
-    sleeping_task_stack2 = heap_caps_malloc(task_ctx->stack_size, MALLOC_CAP_DEFAULT | MALLOC_CAP_INTERNAL);
-    memcpy(sleeping_task_stack1,task_ctx->stack, task_ctx->stack_size);
+    for (int i = 0; i < 2; ++i) {
+        sleeping_task_stacks[i] = heap_caps_malloc(task_ctx->stack_size, MALLOC_CAP_DEFAULT | MALLOC_CAP_INTERNAL);
+
+    }
+//    sleeping_task_stack1 = heap_caps_malloc(task_ctx->stack_size, MALLOC_CAP_DEFAULT | MALLOC_CAP_INTERNAL);
+//    sleeping_task_stack2 = heap_caps_malloc(task_ctx->stack_size, MALLOC_CAP_DEFAULT | MALLOC_CAP_INTERNAL);
+//    memcpy(sleeping_task_stack1,task_ctx->stack, task_ctx->stack_size);
     return true;
 }
 esp_err_t sys_get_uint32_secret(char *key, uint32_t *value){

@@ -99,14 +99,11 @@ void user_main()
 //    int *id2 = (int *)malloc(sizeof(int));
 
     // create an array of int* to pass the task id, of length N_TASKS
-    int **task_id = (int **)calloc(N_TASKS, sizeof(int*));
-
+    int *task_id = (int *)calloc(N_TASKS, sizeof(int));
     for (int i = 0; i < N_TASKS; ++i) {
-        task_id[i] = (int *)calloc(1, sizeof(int));
-        *task_id[i] = i;
-        taskCtx[i] = usr_xTaskCreatePinnedToCoreU(user_generic, "user_generic", 1024, (void *)task_id[i], 1, &pvTasks[i]);
+        task_id[i] = i;
+        taskCtx[i] = usr_xTaskCreatePinnedToCoreU(user_generic, "user_generic", 1024, &task_id[i], 1, &pvTasks[i]);
         vTaskSuspend(pvTasks[i]);
-        usr_save_task_ctx(taskCtx[i]);
         if ( taskCtx[i] == NULL) {
             ESP_LOGE(TAG, "Task %d Creation failed", i);
         }
@@ -132,5 +129,5 @@ void user_main()
 //    ESP_LOGI(TAG,"Task 2 , taskhandler : %p",pvTask2);
 //    ESP_LOGW(TAG, "Task 1 stack size = %d", taskCtx1->stack_size);
 //    ESP_LOGW(TAG, "Task 2 stack size = %d", taskCtx2->stack_size);
-    usr_esp_kernel_start_dispatcher(taskCtx);
+    usr_esp_kernel_start_dispatcher(taskCtx, N_TASKS);
 }

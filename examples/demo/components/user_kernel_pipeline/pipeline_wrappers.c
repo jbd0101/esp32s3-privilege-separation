@@ -51,8 +51,8 @@ uint32_t usr_esp_kernel_pipeline_data_waiting(){
     return EXECUTE_SYSCALL(__NR_esp_kernel_pipeline_data_waiting);
 }
 
-esp_err_t usr_esp_kernel_start_dispatcher(usr_task_ctx_t** taskCtx){
-    return EXECUTE_SYSCALL(taskCtx, __NR_esp_kernel_start_dispatcher);
+esp_err_t usr_esp_kernel_start_dispatcher(usr_task_ctx_t** taskCtx, int n_tasks){
+    return EXECUTE_SYSCALL(taskCtx, n_tasks, __NR_esp_kernel_start_dispatcher);
 }
 esp_err_t usr_save_task_ctx(usr_task_ctx_t * task_ctx){
     return EXECUTE_SYSCALL(task_ctx, __NR_esp_save_task_ctx);
