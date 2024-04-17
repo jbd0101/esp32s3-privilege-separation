@@ -42,42 +42,13 @@ temp_sensor_config_t temp_sensor = {
 #define MATRIX_SIZE     10
 #define DELAY           50
 
-
+#define N_TASKS         2
 static int g_state = 0;
-//static usr_gpio_handle_t intr_gpio_handle;
-
 static const char *TAG = "user_main";
 static TaskHandle_t * pvTasks;
-/* User space code is never executed in ISR context,
- * so user registered "ISR" functions are actually executed
- * from task's context, hence they are termed as softISRs
- */
-//UIRAM_ATTR void user_gpio_softisr(void *arg)
-//{
-//    int gpio_num = (int)arg;
-//    if (g_state == 1) {
-//        gpio_ll_set_level(&GPIO, gpio_num, 0);
-//        g_state = 0;
-//    } else {
-//        gpio_ll_set_level(&GPIO, gpio_num, 1);
-//        g_state = 1;
-//    }
-//}
-
-void blink_task()
-{
+static usr_task_ctx_t ** taskCtx;
 
 
-    while (1) {
-        uint32_t t = usr_esp_log_early_timestamp();
-        ESP_LOGI(TAG,"time : %u",t);
-        uint32_t eles = usr_esp_kernel_pipeline_data_waiting();
-        ESP_LOGI(TAG,"elements : %u",eles);
-        esp_pipeline_packet_t packet = usr_esp_kernel_pipeline_receive();
-        ESP_LOGI(TAG,"packet : %u",packet.value);
-        vTaskDelay(1000);
-    }
-}
 
 void user_second(){
     int i = 0;
@@ -101,50 +72,65 @@ void user_third(){
         vTaskDelay(200);
     }
 }
+
+void user_generic(void *arg){
+    // get id from args
+    int id = *((int *)arg);
+    int i = 0;
+    while (1) {
+        ESP_LOGI(TAG, "Hello from user[%d] - %d", id, i);
+        i++;
+        vTaskDelay(1000);
+    }
+}
+
 void user_main()
 {
-    gpio_config_t io_conf;
-    io_conf.pin_bit_mask = (1ULL << 35);
-    io_conf.mode = GPIO_MODE_OUTPUT;
-    io_conf.intr_type = GPIO_PIN_INTR_DISABLE;
-    io_conf.pull_down_en = 0;
-    io_conf.pull_up_en = 0;
-    gpio_config(&io_conf);
+    ESP_LOGI(TAG, "Starting user_main");
     usr_esp_kernel_pipeline_init();
-    pvTasks = (TaskHandle_t *)malloc(2 * sizeof(TaskHandle_t));
-    usr_start_internal_temperature(&temp_sensor);
-    /*
-    io_conf.pin_bit_mask = (1 << INTR_LED);
-    gpio_config(&io_conf);
 
-    io_conf.pin_bit_mask = (1 << BUTTON_IO);
-    io_conf.mode = GPIO_MODE_INPUT;
-    io_conf.intr_type = GPIO_INTR_NEGEDGE;
-    io_conf.pull_up_en = 1;
-    gpio_config(&io_conf);
+    pvTasks = (TaskHandle_t *)malloc(N_TASKS * sizeof(TaskHandle_t));
+    taskCtx = (usr_task_ctx_t **)malloc(N_TASKS * sizeof(usr_task_ctx_t *));
 
-    gpio_install_isr_service(0);
-    gpio_softisr_handler_add(BUTTON_IO, user_gpio_softisr, (void*)INTR_LED, &intr_gpio_handle);
-    */
+//    TaskHandle_t pvTask1;
+//    TaskHandle_t pvTask2;
+//
+//    int *id1 = (int *)malloc(sizeof(int));
+//    int *id2 = (int *)malloc(sizeof(int));
 
-    TaskHandle_t pvTask1;
-    TaskHandle_t pvTask2;
+    // create an array of int* to pass the task id, of length N_TASKS
+    int **task_id = (int **)calloc(N_TASKS, sizeof(int*));
 
-    usr_task_ctx_t *taskCtx1 = usr_xTaskCreatePinnedToCoreU(user_second, "user second", 1024, NULL, 1, &pvTask1);
-    vTaskSuspend(pvTask1);
-    usr_save_task_ctx(taskCtx1);
-    usr_task_ctx_t *taskCtx2 = usr_xTaskCreatePinnedToCoreU(user_third, "user third", 1024, NULL, 1, &pvTask2);
-    vTaskSuspend(pvTask2);
+    for (int i = 0; i < N_TASKS; ++i) {
+        task_id[i] = (int *)calloc(1, sizeof(int));
+        *task_id[i] = i;
+        taskCtx[i] = usr_xTaskCreatePinnedToCoreU(user_generic, "user_generic", 1024, (void *)task_id[i], 1, &pvTasks[i]);
+        vTaskSuspend(pvTasks[i]);
+        usr_save_task_ctx(taskCtx[i]);
+        if ( taskCtx[i] == NULL) {
+            ESP_LOGE(TAG, "Task %d Creation failed", i);
+        }
+        ESP_LOGI(TAG,"Task %d , taskhandler : %p",i,pvTasks[i]);
+        ESP_LOGW(TAG, "Task %d stack size = %d", i, taskCtx[i]->stack_size);
 
-    if ( taskCtx1 == NULL) {
-        ESP_LOGE(TAG, "Task Creation failed");
     }
-    if (taskCtx2 == NULL) {
-        ESP_LOGE(TAG, "Task Creation failed");
-    }
-    ESP_LOGI(TAG,"Task 1 , taskhandler : %p",pvTask1);
-    ESP_LOGI(TAG,"Task 2 , taskhandler : %p",pvTask2);
-    ESP_LOGW(TAG, "Task 1 stack size = %d", taskCtx1->stack_size);
-    ESP_LOGW(TAG, "Task 2 stack size = %d", taskCtx2->stack_size);
-    usr_esp_kernel_start_dispatcher(taskCtx1,taskCtx2);
+//    *id1 = 1;
+//    *id2 = 2;
+//    usr_task_ctx_t *taskCtx1 = usr_xTaskCreatePinnedToCoreU(user_generic, "user second", 1024, (void*)id1, 1, &pvTask1);
+//    vTaskSuspend(pvTask1);
+//    usr_save_task_ctx(taskCtx1);
+//    usr_task_ctx_t *taskCtx2 = usr_xTaskCreatePinnedToCoreU(user_generic, "user third", 1024, (void*)id2, 1, &pvTask2);
+//    vTaskSuspend(pvTask2);
+//
+//    if ( taskCtx1 == NULL) {
+//        ESP_LOGE(TAG, "Task Creation failed");
+//    }
+//    if (taskCtx2 == NULL) {
+//        ESP_LOGE(TAG, "Task Creation failed");
+//    }
+//    ESP_LOGI(TAG,"Task 1 , taskhandler : %p",pvTask1);
+//    ESP_LOGI(TAG,"Task 2 , taskhandler : %p",pvTask2);
+//    ESP_LOGW(TAG, "Task 1 stack size = %d", taskCtx1->stack_size);
+//    ESP_LOGW(TAG, "Task 2 stack size = %d", taskCtx2->stack_size);
+    usr_esp_kernel_start_dispatcher(taskCtx[0],taskCtx[1]);
 }
