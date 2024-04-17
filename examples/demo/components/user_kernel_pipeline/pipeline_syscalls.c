@@ -188,24 +188,29 @@ void sys_user_tasks_dispatcher(){
 
 
 }
-esp_err_t sys_esp_kernel_start_dispatcher(usr_task_ctx_t* taskCtx1, usr_task_ctx_t* taskCtx2) {
-    pvTasks = (TaskHandle_t *)heap_caps_malloc(2 * sizeof(TaskHandle_t), MALLOC_CAP_DEFAULT | MALLOC_CAP_INTERNAL);
-    tskCtxs = (usr_task_ctx_t *)heap_caps_malloc(2 * sizeof(usr_task_ctx_t), MALLOC_CAP_DEFAULT | MALLOC_CAP_INTERNAL);
+esp_err_t sys_esp_kernel_start_dispatcher(usr_task_ctx_t** taskCtx) {
+    int n_tasks = 2;
+    pvTasks = (TaskHandle_t *)heap_caps_malloc(n_tasks * sizeof(TaskHandle_t), MALLOC_CAP_DEFAULT | MALLOC_CAP_INTERNAL);
+    tskCtxs = (usr_task_ctx_t *)heap_caps_malloc(n_tasks * sizeof(usr_task_ctx_t), MALLOC_CAP_DEFAULT | MALLOC_CAP_INTERNAL);
     if (!pvTasks) {
         return ESP_FAIL;
     }
-
-    ESP_LOGW(TAG, "Task 1 stack size = %d", taskCtx1->stack_size);
-    ESP_LOGW(TAG, "Task 2 stack size = %d", taskCtx2->stack_size);
-    pvTasks[0] = *((TaskHandle_t *)(taskCtx1->task_handle));
-    pvTasks[1] = *((TaskHandle_t *)(taskCtx2->task_handle));
-    tskCtxs[0] = *taskCtx1;
-    tskCtxs[1] = *taskCtx2;
-    ESP_LOGW("TEST", "Task 1 stack size = %d, address of task handle = %p | pvtask = %p", taskCtx1->stack_size, (void *)taskCtx1->task_handle, pvTasks[0]);
-    ESP_LOGW("TEST", "Task 2 stack size = %d, address of task handle = %p | pvtask = %p", taskCtx2->stack_size, (void *)taskCtx2->task_handle, pvTasks[1]);
+    for (int i = 0; i < n_tasks; ++i) {
+        ESP_LOGW(TAG, "Task %d stack size = %d", i, taskCtx[i]->stack_size);
+        pvTasks[i] = *((TaskHandle_t *)(taskCtx[i]->task_handle));
+        tskCtxs[i] = *taskCtx[i];
+        ESP_LOGW("TEST", "Task %d stack size = %d, address of task handle = %p | pvtask = %p",i, taskCtx[i]->stack_size, (void *)taskCtx[i]->task_handle, pvTasks[i]);
+    }
+//    ESP_LOGW(TAG, "Task 1 stack size = %d", taskCtx1->stack_size);
+//    ESP_LOGW(TAG, "Task 2 stack size = %d", taskCtx2->stack_size);
+//    pvTasks[0] = *((TaskHandle_t *)(taskCtx1->task_handle));
+//    pvTasks[1] = *((TaskHandle_t *)(taskCtx2->task_handle));
+//    tskCtxs[0] = *taskCtx1;
+//    tskCtxs[1] = *taskCtx2;
+//    ESP_LOGW("TEST", "Task 1 stack size = %d, address of task handle = %p | pvtask = %p", taskCtx1->stack_size, (void *)taskCtx1->task_handle, pvTasks[0]);
+//    ESP_LOGW("TEST", "Task 2 stack size = %d, address of task handle = %p | pvtask = %p", taskCtx2->stack_size, (void *)taskCtx2->task_handle, pvTasks[1]);
     //mallocing the stack for the sleeping task
     xTaskCreatePinnedToCore(sys_user_tasks_dispatcher, "sys_user_tasks_dispatcher", 2048, NULL, 5, NULL, 1);
-
     return ESP_OK;
 }
 esp_err_t sys_save_task_ctx(usr_task_ctx_t *task_ctx){

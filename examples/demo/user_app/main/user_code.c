@@ -132,5 +132,5 @@ void user_main()
 //    ESP_LOGI(TAG,"Task 2 , taskhandler : %p",pvTask2);
 //    ESP_LOGW(TAG, "Task 1 stack size = %d", taskCtx1->stack_size);
 //    ESP_LOGW(TAG, "Task 2 stack size = %d", taskCtx2->stack_size);
-    usr_esp_kernel_start_dispatcher(taskCtx[0],taskCtx[1]);
+    usr_esp_kernel_start_dispatcher(taskCtx);
 }
