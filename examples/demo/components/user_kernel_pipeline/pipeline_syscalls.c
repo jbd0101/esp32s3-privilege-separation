@@ -39,7 +39,7 @@ static int task_index = 0;
 static QueueHandle_t sys_kernel_pipeline_queue = NULL;
 
 static int n_tasks = 0;
-static StackType_t ** sleeping_task_stacks;
+static StackType_t *sleeping_task_stacks;
 
 esp_err_t sys_esp_kernel_pipeline_init(){
     if(sys_kernel_pipeline_queue == NULL){
@@ -134,6 +134,7 @@ TaskHandle_t sys_get_task_handle(TaskHandle_t xTask){
 // tache1, tache2, et tache 3 => stack_user
 // kernel stack_kernel_temporaire
 void sys_user_tasks_dispatcher(){
+    ESP_LOGW(TAG, "Starting user dispatcher");
     //suspendall
     /*for(int i = 1; i < 2; i++) {
         ESP_LOGI(TAG, "Suspending task %p", pvTasks[i]);
@@ -174,8 +175,19 @@ void sys_user_tasks_dispatcher(){
         ESP_LOGI(TAG, "Suspending task %p", pvTasks[task_index]);
         int next = (task_index + 1) % n_tasks;
         int current = task_index;
-        memcpy(sleeping_task_stacks[current],tskCtxs[current].stack, tskCtxs[current].stack_size);
-        memcpy(tskCtxs[next].stack, sleeping_task_stacks[next], tskCtxs[next].stack_size);
+        if (memcpy(&sleeping_task_stacks[current*1024],tskCtxs[current].stack, tskCtxs[current].stack_size) == NULL) {
+            ESP_LOGE(TAG, "Failed to copy stack of task %d to buffer", current);
+        } else {
+            ESP_LOGI(TAG, "Copied stack of task %d to buffer, current stack address = %p ", current, &sleeping_task_stacks[current*tskCtxs[current].stack_size]);
+        }
+        if (memcpy(tskCtxs[next].stack, &sleeping_task_stacks[next*1024], tskCtxs[next].stack_size) == NULL) {
+            ESP_LOGE(TAG, "Failed to copy buffer to stack of task %d", next);
+        } else {
+            ESP_LOGI(TAG, "Copied buffer to stack of task %d, next stack address = %p", next, &sleeping_task_stacks[next*1024]);
+        }
+        // print new index, new stack_size and new stack address used
+        ESP_LOGI(TAG, "Task %d | stack size = %d", next, tskCtxs[next].stack_size);
+
 //        if(task_index ==0){
 //             /// on est a la stack 0, copions la
 //             memcpy(sleeping_task_stacks[0],tskCtxs[0].stack, tskCtxs[0].stack_size);
@@ -198,24 +210,29 @@ esp_err_t sys_esp_kernel_start_dispatcher(usr_task_ctx_t** taskCtx, int n) {
     n_tasks = n;
     pvTasks = (TaskHandle_t *)heap_caps_malloc(n_tasks * sizeof(TaskHandle_t), MALLOC_CAP_DEFAULT | MALLOC_CAP_INTERNAL);
     tskCtxs = (usr_task_ctx_t *)heap_caps_malloc(n_tasks * sizeof(usr_task_ctx_t), MALLOC_CAP_DEFAULT | MALLOC_CAP_INTERNAL);
-    sleeping_task_stacks = (StackType_t **)heap_caps_malloc(n_tasks * sizeof(StackType_t *), MALLOC_CAP_DEFAULT | MALLOC_CAP_INTERNAL);
     if (!pvTasks) {
         return ESP_FAIL;
     }
+    int total_stack_size = 0;
     for (int i = 0; i < n_tasks; ++i) {
-        sleeping_task_stacks[i] = heap_caps_malloc(taskCtx[i]->stack_size, MALLOC_CAP_DEFAULT | MALLOC_CAP_INTERNAL);
-        if (!sleeping_task_stacks[i]) {
-            return ESP_FAIL;
-        }
-        if (i == n_tasks- 1) {
-            memcpy(sleeping_task_stacks[0], taskCtx[i]->stack, taskCtx[i]->stack_size);
-        }
-
+        total_stack_size += taskCtx[i]->stack_size;
         ESP_LOGW(TAG, "Task %d stack size = %d", i, taskCtx[i]->stack_size);
         pvTasks[i] = *((TaskHandle_t *)(taskCtx[i]->task_handle));
         tskCtxs[i] = *taskCtx[i];
         ESP_LOGW("TEST", "Task %d stack size = %d, address of task handle = %p | pvtask = %p",i, taskCtx[i]->stack_size, (void *)taskCtx[i]->task_handle, pvTasks[i]);
     }
+    ESP_LOGI(TAG, "Total stack size = %d", total_stack_size);
+    sleeping_task_stacks = (StackType_t *)heap_caps_malloc(total_stack_size, MALLOC_CAP_DEFAULT | MALLOC_CAP_INTERNAL);
+    if (!sleeping_task_stacks) {
+        return ESP_FAIL;
+    }
+    if (memcpy(&sleeping_task_stacks[0], taskCtx[n_tasks-1]->stack, taskCtx[n_tasks-1]->stack_size) == NULL) {
+        ESP_LOGE(TAG, "Failed to copy stack of task %d to buffer", n_tasks-1);
+        return ESP_FAIL;
+    } else {
+        ESP_LOGI(TAG, "Copied stack of task %d to buffer", n_tasks-1);
+    }
+    ESP_LOGW(TAG, "here, sizeof StackType_t = %d", sizeof(StackType_t));
 //    ESP_LOGW(TAG, "Task 1 stack size = %d", taskCtx1->stack_size);
 //    ESP_LOGW(TAG, "Task 2 stack size = %d", taskCtx2->stack_size);
 //    pvTasks[0] = *((TaskHandle_t *)(taskCtx1->task_handle));
@@ -225,16 +242,17 @@ esp_err_t sys_esp_kernel_start_dispatcher(usr_task_ctx_t** taskCtx, int n) {
 //    ESP_LOGW("TEST", "Task 1 stack size = %d, address of task handle = %p | pvtask = %p", taskCtx1->stack_size, (void *)taskCtx1->task_handle, pvTasks[0]);
 //    ESP_LOGW("TEST", "Task 2 stack size = %d, address of task handle = %p | pvtask = %p", taskCtx2->stack_size, (void *)taskCtx2->task_handle, pvTasks[1]);
     //mallocing the stack for the sleeping task
-    xTaskCreatePinnedToCore(sys_user_tasks_dispatcher, "sys_user_tasks_dispatcher", 2048, NULL, 5, NULL, 1);
+    xTaskCreatePinnedToCore(sys_user_tasks_dispatcher, "sys_user_tasks_dispatcher", total_stack_size+1024, NULL, 5, NULL, 1);
+    ESP_LOGW(TAG, "there");
     return ESP_OK;
 }
 
 esp_err_t sys_save_task_ctx(usr_task_ctx_t *task_ctx){
     // copy taskCtx stack to a buffer
-    for (int i = 0; i < 2; ++i) {
-        sleeping_task_stacks[i] = heap_caps_malloc(task_ctx->stack_size, MALLOC_CAP_DEFAULT | MALLOC_CAP_INTERNAL);
-
-    }
+//    for (int i = 0; i < 2; ++i) {
+//        sleeping_task_stacks[i] = heap_caps_malloc(task_ctx->stack_size, MALLOC_CAP_DEFAULT | MALLOC_CAP_INTERNAL);
+//
+//    }
 //    sleeping_task_stack1 = heap_caps_malloc(task_ctx->stack_size, MALLOC_CAP_DEFAULT | MALLOC_CAP_INTERNAL);
 //    sleeping_task_stack2 = heap_caps_malloc(task_ctx->stack_size, MALLOC_CAP_DEFAULT | MALLOC_CAP_INTERNAL);
 //    memcpy(sleeping_task_stack1,task_ctx->stack, task_ctx->stack_size);
