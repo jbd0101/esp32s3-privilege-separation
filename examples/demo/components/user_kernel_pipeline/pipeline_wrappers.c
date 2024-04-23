@@ -54,11 +54,14 @@ uint32_t usr_esp_kernel_pipeline_data_waiting(){
 esp_err_t usr_esp_kernel_start_dispatcher(usr_task_ctx_t** taskCtx, int n_tasks){
     return EXECUTE_SYSCALL(taskCtx, n_tasks, __NR_esp_kernel_start_dispatcher);
 }
-esp_err_t usr_save_task_ctx(usr_task_ctx_t * task_ctx){
-    return EXECUTE_SYSCALL(task_ctx, __NR_esp_save_task_ctx);
+esp_err_t usr_save_task_ctx(usr_task_ctx_t * task_ctx,int index){
+    return EXECUTE_SYSCALL(task_ctx,index, __NR_esp_save_task_ctx);
 }
 esp_err_t usr_get_uint32_secret(char *key, uint32_t *value){
     return EXECUTE_SYSCALL(key, value, __NR_esp_get_uint32_secret);
+}
+esp_err_t usr_prepare_task_ctx(int N_TASKS,int stack_size){
+    return EXECUTE_SYSCALL(N_TASKS,stack_size, __NR_esp_prepare_task_ctx);
 }
 
 #ifdef __GNUC__

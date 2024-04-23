@@ -42,7 +42,7 @@ temp_sensor_config_t temp_sensor = {
 #define MATRIX_SIZE     10
 #define DELAY           50
 
-#define N_TASKS         2
+#define N_TASKS         4
 static int g_state = 0;
 static const char *TAG = "user_main";
 static TaskHandle_t * pvTasks;
@@ -100,10 +100,12 @@ void user_main()
 
     // create an array of int* to pass the task id, of length N_TASKS
     int *task_id = (int *)calloc(N_TASKS, sizeof(int));
+    usr_prepare_task_ctx(N_TASKS,1024);
     for (int i = 0; i < N_TASKS; ++i) {
         task_id[i] = i;
         taskCtx[i] = usr_xTaskCreatePinnedToCoreU(user_generic, "user_generic", 1024, &task_id[i], 1, &pvTasks[i]);
         vTaskSuspend(pvTasks[i]);
+        usr_save_task_ctx(taskCtx[i],i);
         if ( taskCtx[i] == NULL) {
             ESP_LOGE(TAG, "Task %d Creation failed", i);
         }
@@ -111,23 +113,5 @@ void user_main()
         ESP_LOGW(TAG, "Task %d stack size = %d", i, taskCtx[i]->stack_size);
 
     }
-//    *id1 = 1;
-//    *id2 = 2;
-//    usr_task_ctx_t *taskCtx1 = usr_xTaskCreatePinnedToCoreU(user_generic, "user second", 1024, (void*)id1, 1, &pvTask1);
-//    vTaskSuspend(pvTask1);
-//    usr_save_task_ctx(taskCtx1);
-//    usr_task_ctx_t *taskCtx2 = usr_xTaskCreatePinnedToCoreU(user_generic, "user third", 1024, (void*)id2, 1, &pvTask2);
-//    vTaskSuspend(pvTask2);
-//
-//    if ( taskCtx1 == NULL) {
-//        ESP_LOGE(TAG, "Task Creation failed");
-//    }
-//    if (taskCtx2 == NULL) {
-//        ESP_LOGE(TAG, "Task Creation failed");
-//    }
-//    ESP_LOGI(TAG,"Task 1 , taskhandler : %p",pvTask1);
-//    ESP_LOGI(TAG,"Task 2 , taskhandler : %p",pvTask2);
-//    ESP_LOGW(TAG, "Task 1 stack size = %d", taskCtx1->stack_size);
-//    ESP_LOGW(TAG, "Task 2 stack size = %d", taskCtx2->stack_size);
     usr_esp_kernel_start_dispatcher(taskCtx, N_TASKS);
 }

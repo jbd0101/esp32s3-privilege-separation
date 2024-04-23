@@ -5,3 +5,4 @@
 1284  custom  esp_kernel_start_dispatcher                sys_esp_kernel_start_dispatcher
 1285  custom  esp_save_task_ctx                          sys_save_task_ctx
 1286  custom  esp_get_uint32_secret                      sys_get_uint32_secret
+1287  custom  esp_prepare_task_ctx                       sys_prepare_task_ctx
