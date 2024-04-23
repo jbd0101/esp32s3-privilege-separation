@@ -43,11 +43,10 @@ temp_sensor_config_t temp_sensor = {
 #define DELAY           50
 
 #define N_TASKS         4
-static int g_state = 0;
 static const char *TAG = "user_main";
 static TaskHandle_t * pvTasks;
 static usr_task_ctx_t ** taskCtx;
-
+static int counter = 0;
 
 
 void user_second(){
@@ -75,7 +74,8 @@ void user_third(){
 
 void user_generic(void *arg){
     // get id from args
-    int id = *((int *)arg);
+    int id = counter;
+    counter++;
     int i = 0;
     while (1) {
         ESP_LOGI(TAG, "Hello from user[%d] - %d", id, i);
