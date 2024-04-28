@@ -42,10 +42,10 @@ esp_err_t usr_esp_kernel_pipeline_init(){
     return EXECUTE_SYSCALL(__NR_esp_kernel_pipeline_init);
 }
 
-esp_pipeline_packet_t usr_esp_kernel_pipeline_receive() {
-    esp_pipeline_packet_t packet;
-    EXECUTE_SYSCALL(&packet, __NR_esp_kernel_pipeline_receive);
-    return packet;
+esp_err_t usr_esp_kernel_pipeline_receive(esp_pipeline_packet_t * packet) {
+
+    return EXECUTE_SYSCALL(packet, __NR_esp_kernel_pipeline_receive);
+
 }
 uint32_t usr_esp_kernel_pipeline_data_waiting(){
     return EXECUTE_SYSCALL(__NR_esp_kernel_pipeline_data_waiting);

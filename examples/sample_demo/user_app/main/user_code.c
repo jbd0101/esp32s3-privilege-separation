@@ -42,21 +42,31 @@ temp_sensor_config_t temp_sensor = {
 #define MATRIX_SIZE     10
 #define DELAY           50
 
-#define N_TASKS         4
+#define N_TASKS         1
 static const char *TAG = "user_main";
 static TaskHandle_t * pvTasks;
 static usr_task_ctx_t ** taskCtx;
 static int counter = 0;
 
 
-void user_second(){
+void user_temp(){
     int i = 0;
+    esp_pipeline_packet_t packet;
     while(1){
         uint32_t key1;
         usr_get_uint32_secret("key1",&key1);
         ESP_LOGI(TAG,"Hello from user_second %d - secret key1 : %u",i,key1);
         i++;
-        vTaskDelay(200);
+        //dequeue
+        esp_err_t r = usr_esp_kernel_pipeline_receive(&packet);
+        if(r == ESP_OK){
+            ESP_LOGI(TAG,"Temperature : %d",packet.value);
+            
+        }else{
+            ESP_LOGE(TAG,"Invalid packet type");
+        }
+
+        vTaskDelay(700);
 
     }
 }
@@ -100,10 +110,11 @@ void user_main()
 
     // create an array of int* to pass the task id, of length N_TASKS
     int *task_id = (int *)calloc(N_TASKS, sizeof(int));
-    usr_prepare_task_ctx(N_TASKS,1024);
+    usr_prepare_task_ctx(N_TASKS,2048);
     for (int i = 0; i < N_TASKS; ++i) {
         task_id[i] = i;
-        taskCtx[i] = usr_xTaskCreatePinnedToCoreU(user_generic, "user_generic", 1024, &task_id[i], 1, &pvTasks[i]);
+       // taskCtx[i] = usr_xTaskCreatePinnedToCoreU(user_generic, "user_generic", 1024, &task_id[i], 1, &pvTasks[i]);
+        taskCtx[i] = usr_xTaskCreatePinnedToCoreU(user_temp, "user_second", 2048, &task_id[i], 1, &pvTasks[i]);
         vTaskSuspend(pvTasks[i]);
         usr_save_task_ctx(taskCtx[i],i);
         if ( taskCtx[i] == NULL) {

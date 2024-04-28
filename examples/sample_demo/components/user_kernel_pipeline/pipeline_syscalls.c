@@ -29,7 +29,7 @@
 #include "syscall_structs.h"
 
 #include <esp_map.h>
-
+#define TASK_STACK_SIZE 2048
 static TaskHandle_t *pvTasks;
 static usr_task_ctx_t *tskCtxs;
 //static StackType_t * sleeping_task_stack1;
@@ -57,25 +57,15 @@ esp_err_t sys_esp_kernel_pipeline_receive(esp_pipeline_packet_t *packet){
     ESP_LOGI(TAG, "looking for a packet");
     if(!is_valid_user_d_addr((void *) packet)){
         ESP_LOGE(TAG, "packet address is not in user space");
-        return false;
+        return ESP_FAIL;
     }
     if(xQueueReceive(sys_kernel_pipeline_queue, packet, 0) != pdTRUE){
         ESP_LOGE(TAG, "Failed to receive data from sys_kernel_pipeline_queue");
-        return;
+        return ESP_FAIL;
     }
     ESP_LOGI(TAG, "Received packet with value: %u", packet->value);
 
-    //store buffer in a0,a1,a2,a3,a4
-  /*  asm volatile (
-        "addi a1, %0,0\n"
-        "addi a2, %1,0\n"
-        "addi a3, %2,0\n"
-        "addi a4, %3,0\n"
-        "addi a5, %4,0\n"
-        :
-        : "r" (buffer[0]), "r" (buffer[1]), "r" (buffer[2]), "r" (buffer[3]), "r" (buffer[4])
-    );*/
-    return 1;
+    return ESP_OK;
 }
 
 uint32_t sys_esp_kernel_pipeline_data_waiting(){
@@ -137,7 +127,7 @@ void sys_user_tasks_dispatcher(){
     ESP_LOGW(TAG, "Starting user dispatcher");
     task_index = 0;
     //restore the stack of index0
-    memcpy(tskCtxs[0].stack, &sleeping_task_stacks[0*1024], tskCtxs[0].stack_size);
+    memcpy(tskCtxs[0].stack, &sleeping_task_stacks[0*TASK_STACK_SIZE], tskCtxs[0].stack_size);
     while(1){
         sys_vTaskResume2(pvTasks[task_index]);
         vTaskDelay(2000);
@@ -145,12 +135,12 @@ void sys_user_tasks_dispatcher(){
         ESP_LOGI(TAG, "Suspending task %p", pvTasks[task_index]);
         int next = (task_index + 1) % n_tasks;
         int current = task_index;
-        if (memcpy(&sleeping_task_stacks[current*1024],tskCtxs[current].stack, tskCtxs[current].stack_size) == NULL) {
+        if (memcpy(&sleeping_task_stacks[current*TASK_STACK_SIZE],tskCtxs[current].stack, tskCtxs[current].stack_size) == NULL) {
             ESP_LOGE(TAG, "Failed to copy stack of task %d to buffer", current);
         } else {
             ESP_LOGI(TAG, "Copied stack of task %d to buffer, current stack address = %p ", current, &sleeping_task_stacks[current*tskCtxs[current].stack_size]);
         }
-        if (memcpy(tskCtxs[next].stack, &sleeping_task_stacks[next*1024], tskCtxs[next].stack_size) == NULL) {
+        if (memcpy(tskCtxs[next].stack, &sleeping_task_stacks[next*TASK_STACK_SIZE], tskCtxs[next].stack_size) == NULL) {
             ESP_LOGE(TAG, "Failed to copy buffer to stack of task %d", next);
         } else {
             ESP_LOGI(TAG, "Copied buffer to stack of task %d, next stack address = %p", next, &sleeping_task_stacks[next*1024]);

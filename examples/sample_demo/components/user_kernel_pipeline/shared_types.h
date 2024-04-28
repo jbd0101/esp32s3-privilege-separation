@@ -1,6 +1,7 @@
 #ifndef SHARED_TYPES_H
 enum esp_pipeline_packet_type_t {
-    ESP_SYSCALL_EVENT_SENSOR1,
+    ESP_SYSCALL_EVENT_NONE,
+    ESP_SYSCALL_EVENT_TEMP,
     ESP_SYSCALL_EVENT_SENSOR2,
 };
 

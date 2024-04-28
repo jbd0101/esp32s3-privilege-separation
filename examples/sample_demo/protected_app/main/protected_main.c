@@ -36,11 +36,11 @@
 //builtin temperature sensor
 #include "driver/temp_sensor.h"
 #define TAG "protected_app"
-/*
+
 temp_sensor_config_t temp_sensor = {
         .dac_offset = TSENS_DAC_L2,
         .clk_div = 6,
-};*/
+};
 
 IRAM_ATTR void user_app_exception_handler(void *arg)
 {
@@ -81,17 +81,26 @@ void app_main()
 
 
     esp_priv_access_set_periph_perm(PA_GPIO, PA_WORLD_1, PA_PERM_ALL);
-    //temp_sensor_set_config(temp_sensor);
-    //ret = temp_sensor_start();
+    temp_sensor_set_config(temp_sensor);
+    ret = temp_sensor_start();
 
-
+    sys_esp_kernel_pipeline_init();
     ret = esp_priv_access_user_boot();
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to boot user app %d\n", ret);
     }
 
     for (int i = 0; ; i++) {
-       ets_printf("Hello from protected environment\n");
-       vTaskDelay(500);
+        //get temperature
+        float temp;
+        temp_sensor_read_celsius(&temp);
+        ESP_LOGI(TAG, "Sending Temperature: %f to user apps", temp);
+        //push to queue
+        esp_pipeline_packet_t packet;
+        packet.type = ESP_SYSCALL_EVENT_TEMP;
+        packet.value = temp;
+        sys_esp_kernel_pipeline_push(packet);
+
+        vTaskDelay(1000);
     }
 }

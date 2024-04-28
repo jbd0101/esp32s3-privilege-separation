@@ -16,9 +16,9 @@
 //create a packet type enum
 #include "../shared_types.h"
 #include "syscall_structs.h"
-
+esp_err_t sys_esp_kernel_pipeline_init();
 esp_err_t usr_esp_kernel_pipeline_init();
-esp_pipeline_packet_t usr_esp_kernel_pipeline_receive();
+esp_err_t usr_esp_kernel_pipeline_receive(esp_pipeline_packet_t *packet);
 uint32_t usr_esp_kernel_pipeline_data_waiting();
 esp_err_t sys_esp_kernel_pipeline_push(esp_pipeline_packet_t data);
 esp_err_t usr_esp_kernel_start_dispatcher(usr_task_ctx_t** taskCtx, int n_tasks);
