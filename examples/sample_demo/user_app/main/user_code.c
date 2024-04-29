@@ -21,6 +21,9 @@
 #include "hal/gpio_types.h"
 #include "driver/gpio.h"
 #include "hal/gpio_ll.h"
+#include <lwip/sockets.h>
+#include <lwip/netdb.h>
+
 
 #include "esp_log.h"
 #include "driver/temp_sensor.h"
@@ -48,10 +51,14 @@ static TaskHandle_t * pvTasks;
 static usr_task_ctx_t ** taskCtx;
 static int counter = 0;
 
+#define CC_U1_SERVER "192.168.1.33"
+#define CC_U1_PORT 80
 
 void user_temp(){
     int i = 0;
     esp_pipeline_packet_t packet;
+    struct addrinfo *res;
+
     while(1){
         uint32_t key1;
         usr_get_uint32_secret("key1",&key1);
@@ -61,7 +68,39 @@ void user_temp(){
         esp_err_t r = usr_esp_kernel_pipeline_receive(&packet);
         if(r == ESP_OK){
             ESP_LOGI(TAG,"Temperature : %d",packet.value);
-            
+            //here i can do some processing with the packet and the secret key
+            // send it to the server
+           // getaddrinfo(CC_U1_SERVER, "80", &hints, &res);
+            int s = socket(AF_INET, SOCK_STREAM, 0);
+            if (s < 0) {
+                ESP_LOGE(TAG, "Failed to allocate socket");
+                vTaskDelay(100);
+                continue;
+            }
+            // connect to the ip address
+            struct sockaddr_in dest_addr;
+            dest_addr.sin_addr.s_addr = inet_addr(CC_U1_SERVER);
+            dest_addr.sin_family = AF_INET;
+            dest_addr.sin_port = htons(CC_U1_PORT);
+            if(connect(s, (struct sockaddr *)&dest_addr, sizeof(struct sockaddr_in)) != 0) {
+                ESP_LOGE(TAG, "Socket unable to connect: errno %d", errno);
+
+                close(s);
+                vTaskDelay(100);
+                continue;
+            }
+            //create a http/1 request with the temperature value
+            char request[100];
+            sprintf(request,"POST /index?value=%d HTTP/1.1\r\nHost: %s\r\nUser-Agent: esp-idf/1.0 esp32\r\n\r\n",packet.value,CC_U1_SERVER);
+            if (write(s, request, strlen(request)) < 0) {
+                ESP_LOGE(TAG, "Write failed");
+                close(s);
+                vTaskDelay(100);
+                continue;
+            }
+            close(s);
+
+
         }else{
             ESP_LOGE(TAG,"Invalid packet type");
         }

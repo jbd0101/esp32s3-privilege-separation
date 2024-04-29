@@ -19,7 +19,7 @@ $ git checkout v4.4.3
 $ git submodule update --init --recursive
 $ ./install.sh
 $ source ./export.sh
-```
+```[README.md](README.md)
 
 #### Apply patch on IDF:
 

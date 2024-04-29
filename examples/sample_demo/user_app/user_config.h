@@ -4,3 +4,5 @@
 
 /* If set to 1, all the user code is placed in user IRAM */
 #define CONFIG_USER_CODE_IN_IRAM     0
+#define CONFIG_USER_CODE_IN_IRAM     0
+
