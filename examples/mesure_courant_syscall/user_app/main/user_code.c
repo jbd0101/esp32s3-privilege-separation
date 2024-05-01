@@ -35,8 +35,8 @@ temp_sensor_config_t temp_sensor = {
 #define INTR_LED        2
 #define BLINK_GPIO      35
 
-#define SYSCALL         0
-#define NORMAL          1
+#define SYSCALL         1
+#define NORMAL          0
 
 #define MODE            SYSCALL
 #define MATRIX_SIZE     10
@@ -55,14 +55,16 @@ void usr_syscall_mat_sum(int *a,int *b)
     int n = MATRIX_SIZE;
     int c[n*n];
     //set level gpio 36 to 1
-    gpio_ll_set_level(&GPIO, 36, 1);
+    gpio_ll_set_level(&GPIO, 35, 0);
     for(int i=0;i<n;i++){
         for(int j=0;j<n;j++){
             c[i*n+j] = usr_add_a_b(1,1);
         }
     }
     //set level gpio 36 to 0
-    gpio_ll_set_level(&GPIO, 36, 0);
+    gpio_ll_set_level(&GPIO, 35, 1);
+    vTaskDelay(100/portTICK_PERIOD_MS);
+
 }
 
 void usr_normal_mat_sum(int *a,int *b)
@@ -121,14 +123,14 @@ void blink_task()
 void user_main()
 {
     gpio_config_t io_conf;
-    io_conf.pin_bit_mask = (1ULL << 35) | (1ULL << 36);
+    io_conf.pin_bit_mask = (1ULL << 35);
     io_conf.mode = GPIO_MODE_OUTPUT;
     io_conf.intr_type = GPIO_PIN_INTR_DISABLE;
     io_conf.pull_down_en = 0;
     io_conf.pull_up_en = 0;
     gpio_config(&io_conf);
 
-    usr_start_internal_temperature(&temp_sensor);
+   // usr_start_internal_temperature(&temp_sensor);
     /*
     io_conf.pin_bit_mask = (1 << INTR_LED);
     gpio_config(&io_conf);

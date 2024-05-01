@@ -29,6 +29,8 @@
 #include "ws2812.h"
 #include <pipeline_syscall.h>
 #include "nvs_flash.h"
+
+#include "wifi_connect.c"
 //inclue UART
 #include "driver/uart.h"
 //temperature
@@ -43,24 +45,7 @@ temp_sensor_config_t temp_sensor = {
         .dac_offset = TSENS_DAC_L2,
         .clk_div = 6,
 };
-#define CONFIG_ESP_WIFI_AUTH_WPA_WPA2_PSK 1
-#if CONFIG_ESP_WIFI_AUTH_OPEN
-#define ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_OPEN
-#elif CONFIG_ESP_WIFI_AUTH_WEP
-#define ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_WEP
-#elif CONFIG_ESP_WIFI_AUTH_WPA_PSK
-#define ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_WPA_PSK
-#elif CONFIG_ESP_WIFI_AUTH_WPA2_PSK
-#define ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_WPA2_PSK
-#elif CONFIG_ESP_WIFI_AUTH_WPA_WPA2_PSK
-#define ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_WPA_WPA2_PSK
-#elif CONFIG_ESP_WIFI_AUTH_WPA3_PSK
-#define ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_WPA3_PSK
-#elif CONFIG_ESP_WIFI_AUTH_WPA2_WPA3_PSK
-#define ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_WPA2_WPA3_PSK
-#elif CONFIG_ESP_WIFI_AUTH_WAPI_PSK
-#define ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_WAPI_PSK
-#endif
+
 IRAM_ATTR void user_app_exception_handler(void *arg)
 {
     // Perform actions when user app exception happens
@@ -108,33 +93,24 @@ void app_main()
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to boot user app %d\n", ret);
     }
-    nvs_flash_init();
 
     wifi_config_t wifi_conf = {
             .sta = {
                     .ssid = "24GhzJC",
-                    .password = "15B3BF35A2",
-                    .threshold.authmode = ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD,
+                    .password = "15B3BF35A2"
             }
     };
 
+    if(sys_wifi_connect(&wifi_conf) == ESP_OK) {
+        ESP_LOGI(TAG, "Connected to wifi");
+    }else{
+        ESP_LOGE(TAG, "Failed to connect to wifi");
+    }
 
-    ESP_ERROR_CHECK(esp_netif_init());
 
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
-    esp_netif_create_default_wifi_sta();
-
-    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
-
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA) );
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_conf) );
-    ESP_ERROR_CHECK(esp_wifi_start());
-    ESP_ERROR_CHECK(esp_wifi_connect());
     for (int i = 0; ; i++) {
         //get temperature
-        float temp;
-        temp_sensor_read_celsius(&temp);
+        float temp= 10;
         ESP_LOGI(TAG, "Sending Temperature: %f to user apps", temp);
         //push to queue
         esp_pipeline_packet_t packet;
@@ -142,6 +118,6 @@ void app_main()
         packet.value = temp;
         sys_esp_kernel_pipeline_push(packet);
 
-        vTaskDelay(1000);
+        vTaskDelay(2000);
     }
 }

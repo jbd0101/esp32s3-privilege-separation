@@ -26,8 +26,9 @@
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "esp_priv_access.h"
-
 #define TAG             "protected_app"
+
+
 
 IRAM_ATTR void user_app_exception_handler(void *arg)
 {
