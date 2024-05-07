@@ -52,20 +52,32 @@ static const char *TAG = "user_main";
  */
 void usr_syscall_mat_sum(int *a,int *b)
 {
-    int n = MATRIX_SIZE;
-    int c[n*n];
-    //set level gpio 36 to 1
-    gpio_ll_set_level(&GPIO, 35, 0);
-    for(int i=0;i<n;i++){
-        for(int j=0;j<n;j++){
-            c[i*n+j] = usr_add_a_b(1,1);
-        }
+    int n = 40000000;
+    int c=1;
+    while(n>0){
+        c = c+n;
+        n --;
     }
+    ESP_LOGI(TAG,"val : %d - %d",n,c);
+}
+/*
+ * void usr_syscall_mat_sum(int *a,int *b)
+{
+    int n = 1000000;
+    int c=1;
+    //set level gpio 36 to 1
+   // gpio_ll_set_level(&GPIO, 35, 0);
+    while(n>0){
+       c= usr_add_a_b(c,n);
+        n --;
+    }
+    ESP_LOGI(TAG,"val : %d - %d",n,c);
     //set level gpio 36 to 0
-    gpio_ll_set_level(&GPIO, 35, 1);
-    vTaskDelay(100/portTICK_PERIOD_MS);
+    //gpio_ll_set_level(&GPIO, 35, 1);
+    //vTaskDelay(1000/portTICK_PERIOD_MS);
 
 }
+ */
 
 void usr_normal_mat_sum(int *a,int *b)
 {
@@ -101,22 +113,13 @@ void blink_task()
         a1[i] = i;
         b1[i] = i;
     }
-
     while (1) {
         uint32_t t = usr_esp_log_early_timestamp();
-        ESP_LOGI(TAG,"time : %u",t);
+        usr_syscall_mat_sum(a1,b1);
+        uint32_t prev = usr_esp_log_early_timestamp();
+        ESP_LOGI(TAG,"delta time : %u",prev-t);
 
-        if (MODE == NORMAL){
-            ESP_LOGI(TAG, "normal start");
-            usr_normal_mat_sum(a1,b1);
-            ESP_LOGI(TAG, "normal end");
-        }
-        else if (MODE == SYSCALL){
-            ESP_LOGI(TAG, "syscall start");
-            usr_syscall_mat_sum(a1,b1);
-            ESP_LOGI(TAG, "syscall end");
-        }
-        vTaskDelay(DELAY);
+        vTaskDelay(1000/portTICK_PERIOD_MS);
     }
 }
 

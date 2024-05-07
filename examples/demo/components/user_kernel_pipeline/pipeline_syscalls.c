@@ -27,7 +27,7 @@
 #include <pipeline_syscall_priv.h>
 #include <freertos/queue.h>
 #include "syscall_structs.h"
-
+#define STACK_SIZE 2048
 #include <esp_map.h>
 
 static TaskHandle_t *pvTasks;
@@ -137,7 +137,7 @@ void sys_user_tasks_dispatcher(){
     ESP_LOGW(TAG, "Starting user dispatcher");
     task_index = 0;
     //restore the stack of index0
-    memcpy(tskCtxs[0].stack, &sleeping_task_stacks[0*1024], tskCtxs[0].stack_size);
+    memcpy(tskCtxs[0].stack, &sleeping_task_stacks[0*STACK_SIZE], tskCtxs[0].stack_size);
     while(1){
         sys_vTaskResume2(pvTasks[task_index]);
         vTaskDelay(2000);
@@ -145,15 +145,15 @@ void sys_user_tasks_dispatcher(){
         ESP_LOGI(TAG, "Suspending task %p", pvTasks[task_index]);
         int next = (task_index + 1) % n_tasks;
         int current = task_index;
-        if (memcpy(&sleeping_task_stacks[current*1024],tskCtxs[current].stack, tskCtxs[current].stack_size) == NULL) {
+        if (memcpy(&sleeping_task_stacks[current*STACK_SIZE],tskCtxs[current].stack, tskCtxs[current].stack_size) == NULL) {
             ESP_LOGE(TAG, "Failed to copy stack of task %d to buffer", current);
         } else {
             ESP_LOGI(TAG, "Copied stack of task %d to buffer, current stack address = %p ", current, &sleeping_task_stacks[current*tskCtxs[current].stack_size]);
         }
-        if (memcpy(tskCtxs[next].stack, &sleeping_task_stacks[next*1024], tskCtxs[next].stack_size) == NULL) {
+        if (memcpy(tskCtxs[next].stack, &sleeping_task_stacks[next*STACK_SIZE], tskCtxs[next].stack_size) == NULL) {
             ESP_LOGE(TAG, "Failed to copy buffer to stack of task %d", next);
         } else {
-            ESP_LOGI(TAG, "Copied buffer to stack of task %d, next stack address = %p", next, &sleeping_task_stacks[next*1024]);
+            ESP_LOGI(TAG, "Copied buffer to stack of task %d, next stack address = %p", next, &sleeping_task_stacks[next*STACK_SIZE]);
         }
         // print new index, new stack_size and new stack address used
         ESP_LOGI(TAG, "Task %d | stack size = %d", next, tskCtxs[next].stack_size);
@@ -176,7 +176,7 @@ esp_err_t sys_save_task_ctx(usr_task_ctx_t *task_ctx, int index){
     pvTasks[index] = *((TaskHandle_t *)(task_ctx->task_handle));
     ESP_LOGI(TAG, "SAVING Task %d | stack size = %d", index, tskCtxs[index].stack_size);
     void *p = sleeping_task_stacks;
-    p += index*1024;
+    p += index*STACK_SIZE;
     //memcpy to the sleeping_task_stack
     memcpy(p, task_ctx->stack, task_ctx->stack_size);
     return true;

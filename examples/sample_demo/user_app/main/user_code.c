@@ -51,7 +51,7 @@ static TaskHandle_t * pvTasks;
 static usr_task_ctx_t ** taskCtx;
 static int counter = 0;
 
-#define CC_U1_SERVER "192.168.1.33"
+#define CC_U1_SERVER "192.168.211.220"
 #define CC_U1_PORT 80
 
 void user_temp(){
@@ -91,7 +91,7 @@ void user_temp(){
             }
             //create a http/1 request with the temperature value
             char request[100];
-            sprintf(request,"POST /index?value=%d HTTP/1.1\r\nHost: %s\r\nUser-Agent: esp-idf/1.0 esp32\r\n\r\n",packet.value,CC_U1_SERVER);
+            sprintf(request,"POST /index?value=%d HTTP/0\r\nHost: %s\r\nUser-Agent: esp-idf/1.0 esp32\r\n\r\n",packet.value,CC_U1_SERVER);
             if (write(s, request, strlen(request)) < 0) {
                 ESP_LOGE(TAG, "Write failed");
                 close(s);
@@ -105,7 +105,7 @@ void user_temp(){
             ESP_LOGE(TAG,"Invalid packet type");
         }
 
-        vTaskDelay(700);
+        vTaskDelay(500/portTICK_PERIOD_MS);
 
     }
 }

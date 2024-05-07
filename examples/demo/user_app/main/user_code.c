@@ -42,7 +42,7 @@ temp_sensor_config_t temp_sensor = {
 #define MATRIX_SIZE     10
 #define DELAY           50
 
-#define N_TASKS         4
+#define N_TASKS         3
 static const char *TAG = "user_main";
 static TaskHandle_t * pvTasks;
 static usr_task_ctx_t ** taskCtx;
@@ -56,7 +56,15 @@ void user_second(){
         usr_get_uint32_secret("key1",&key1);
         ESP_LOGI(TAG,"Hello from user_second %d - secret key1 : %u",i,key1);
         i++;
-        vTaskDelay(200);
+        int n = 1000000;
+        int c = 1;
+        while(n>0){
+            c = n+c;
+            n--;
+        }
+        ESP_LOGI(TAG,"Hello from %d - secret key1 : %u - c : %d",i,key1,c);
+
+        vTaskDelay(1000/portTICK_PERIOD_MS);
 
     }
 }
@@ -64,11 +72,38 @@ void user_second(){
 void user_third(){
     int i = 0;
     while(1){
+        uint32_t key1=0;
+        usr_get_uint32_secret("key1",&key1);
+
+        i++;
+        int n = 2000000;
+        int c = 1;
+        while(n>0){
+            c = n+c;
+            n--;
+        }
+        ESP_LOGI(TAG,"Hello from %d - secret key1 : %u - c : %d",i,key1,c);
+        vTaskDelay(1000/portTICK_PERIOD_MS);
+
+    }
+}
+
+void user_fourth(){
+    int i = 0;
+    while(1){
         uint32_t key1;
         usr_get_uint32_secret("key1",&key1);
-        ESP_LOGI(TAG,"Hello from user_second %d - secret key1 : %u",i,key1);
+
         i++;
-        vTaskDelay(200);
+        int n = 3000000;
+        int c = 1;
+        while(n>0){
+            c = n+c;
+            n--;
+        }
+        ESP_LOGI(TAG,"Hello from %d - secret key1 : %u - c : %d",i,key1,c);
+        vTaskDelay(1000/portTICK_PERIOD_MS);
+
     }
 }
 
@@ -100,7 +135,8 @@ void user_main()
 
     // create an array of int* to pass the task id, of length N_TASKS
     int *task_id = (int *)calloc(N_TASKS, sizeof(int));
-    usr_prepare_task_ctx(N_TASKS,1024);
+    usr_prepare_task_ctx(N_TASKS,2048);
+    /*
     for (int i = 0; i < N_TASKS; ++i) {
         task_id[i] = i;
         taskCtx[i] = usr_xTaskCreatePinnedToCoreU(user_generic, "user_generic", 1024, &task_id[i], 1, &pvTasks[i]);
@@ -112,6 +148,22 @@ void user_main()
         ESP_LOGI(TAG,"Task %d , taskhandler : %p",i,pvTasks[i]);
         ESP_LOGW(TAG, "Task %d stack size = %d", i, taskCtx[i]->stack_size);
 
-    }
+    }*/
+    int i=0;
+    task_id[0] = 0;
+    taskCtx[0] = usr_xTaskCreatePinnedToCoreU(user_second, "user_second", 2048, &task_id[0], 1, &pvTasks[0]);
+    vTaskSuspend(pvTasks[i]);
+    usr_save_task_ctx(taskCtx[i],i);
+    i++;
+    task_id[1] = 1;
+    taskCtx[1] = usr_xTaskCreatePinnedToCoreU(user_third, "user_third", 2048, &task_id[1], 1, &pvTasks[1]);
+    vTaskSuspend(pvTasks[i]);
+    usr_save_task_ctx(taskCtx[i],i);
+    i++;
+    task_id[2] = 2;
+    taskCtx[2] = usr_xTaskCreatePinnedToCoreU(user_fourth, "user_third", 2048, &task_id[2], 1, &pvTasks[2]);
+    vTaskSuspend(pvTasks[i]);
+    usr_save_task_ctx(taskCtx[i],i);
+
     usr_esp_kernel_start_dispatcher(taskCtx, N_TASKS);
 }

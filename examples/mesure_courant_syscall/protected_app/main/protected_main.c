@@ -32,7 +32,7 @@
 //builtin temperature sensor
 #include "driver/temp_sensor.h"
 #define TAG "protected_app"
-#define USER_APP 1
+#define USER_APP 0
 #define MODE            SYSCALL
 #define MATRIX_SIZE     10
 #define DELAY           50
@@ -82,24 +82,17 @@ void app_main()
     io_conf.pull_down_en = 0;
     io_conf.pull_up_en = 0;
     gpio_config(&io_conf);
-    int *a1 = malloc(sizeof(int)*MATRIX_SIZE);
-    int *b1 = malloc(sizeof(int)*MATRIX_SIZE);
-    for(int i=0;i<MATRIX_SIZE;i++){
-        a1[i] = i;
-        b1[i] = i;
-    }
-    gpio_set_level(35, 1);
-    while (1) {
-        gpio_set_level(35, 0);
-        int c[MATRIX_SIZE*MATRIX_SIZE];
 
-        //add two matrices
-        for(int i=0;i<MATRIX_SIZE;i++){
-            for(int j=0;j<MATRIX_SIZE;j++){
-                c[i*MATRIX_SIZE+j] = a1[i] + b1[j];
-            }
+    while (1) {
+
+        int n = 40000000;
+        int c=1;
+        while(n>0){
+            c = c+n;
+            n --;
         }
-        gpio_set_level(35, 1);
+        ESP_LOGI(TAG,"val : %d - %d",n,c);
+
         vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
 

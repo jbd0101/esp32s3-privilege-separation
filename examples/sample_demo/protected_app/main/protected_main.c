@@ -59,7 +59,7 @@ void app_main()
     }else{
         ESP_LOGE(TAG, "nvs_flash_init_partition failed");
     }
-    /*
+
     //open partition
     nvs_handle_t handler_task1;
     if(nvs_open_from_partition("static_data", "task1", NVS_READWRITE, &handler_task1) == ESP_OK) {
@@ -76,7 +76,6 @@ void app_main()
     nvs_set_u32(handler_task1,"key2", 654321);
     nvs_set_u32(handler_task2,"key1", 20202020);
     nvs_set_u32(handler_task2,"key2", 30303030);
-*/
 
     ret = esp_priv_access_init(user_app_exception_handler);
     if (ret != ESP_OK) {
@@ -118,6 +117,6 @@ void app_main()
         packet.value = temp;
         sys_esp_kernel_pipeline_push(packet);
 
-        vTaskDelay(2000);
+        vTaskDelay(500/portTICK_PERIOD_MS);
     }
 }
