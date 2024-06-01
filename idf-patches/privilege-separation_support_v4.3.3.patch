@@ -1,0 +1,536 @@
+diff --git a/components/app_update/esp_ota_ops.c b/components/app_update/esp_ota_ops.c
+index 8096591382..aaf09e82f7 100644
+--- a/components/app_update/esp_ota_ops.c
++++ b/components/app_update/esp_ota_ops.c
+@@ -66,8 +66,10 @@ static bool is_ota_partition(const esp_partition_t *p)
+ {
+     return (p != NULL
+             && p->type == ESP_PARTITION_TYPE_APP
+-            && p->subtype >= ESP_PARTITION_SUBTYPE_APP_OTA_0
+-            && p->subtype < ESP_PARTITION_SUBTYPE_APP_OTA_MAX);
++            && ((p->subtype >= ESP_PARTITION_SUBTYPE_APP_OTA_0
++            && p->subtype < ESP_PARTITION_SUBTYPE_APP_OTA_MAX)
++            || (p->subtype >= ESP_PARTITION_SUBTYPE_APP_USER_0
++            && p->subtype <= ESP_PARTITION_SUBTYPE_APP_USER_1)));
+ }
+ 
+ // Read otadata partition and fill array from two otadata structures.
+diff --git a/components/esp32c3/CMakeLists.txt b/components/esp32c3/CMakeLists.txt
+index 393464f5ab..eeec4fd178 100644
+--- a/components/esp32c3/CMakeLists.txt
++++ b/components/esp32c3/CMakeLists.txt
+@@ -43,9 +43,12 @@ else()
+ 
+     target_linker_script(${COMPONENT_LIB} INTERFACE "${CMAKE_CURRENT_BINARY_DIR}/esp32c3_out.ld")
+ 
++    set(project_ld_input "${CMAKE_CURRENT_LIST_DIR}/ld/esp32c3.project.ld.in")
++    set(project_ld_output "${CMAKE_CURRENT_BINARY_DIR}/ld/esp32c3.project.preprocess.ld")
++
+     # Process the template file through the linker script generation mechanism, and use the output for linking the
+     # final binary
+-    target_linker_script(${COMPONENT_LIB} INTERFACE "${CMAKE_CURRENT_LIST_DIR}/ld/esp32c3.project.ld.in"
++    target_linker_script(${COMPONENT_LIB} INTERFACE ${project_ld_output}
+             PROCESS "${CMAKE_CURRENT_BINARY_DIR}/ld/esp32c3.project.ld")
+     target_linker_script(${COMPONENT_LIB} INTERFACE "ld/esp32c3.peripherals.ld")
+ 
+@@ -56,14 +59,16 @@ else()
+     # Preprocess esp32c3.ld linker script to include configuration, becomes esp32c3_out.ld
+     set(LD_DIR ${CMAKE_CURRENT_SOURCE_DIR}/ld)
+     add_custom_command(
+-        OUTPUT esp32c3_out.ld
++        OUTPUT esp32c3_out.ld ${project_ld_output}
+         COMMAND "${CMAKE_C_COMPILER}" -C -P -x c -E -o esp32c3_out.ld -I ${config_dir} ${LD_DIR}/esp32c3.ld
++        COMMAND "${CMAKE_C_COMPILER}" -C -P -x c -E -o ${project_ld_output} -I ${config_dir}
++                -I "${CMAKE_CURRENT_LIST_DIR}" ${project_ld_input}
+         MAIN_DEPENDENCY ${LD_DIR}/esp32c3.ld
+         DEPENDS ${sdkconfig_header}
+         COMMENT "Generating linker script..."
+         VERBATIM)
+ 
+-    add_custom_target(esp32c3_linker_script DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/esp32c3_out.ld)
++    add_custom_target(esp32c3_linker_script DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/esp32c3_out.ld ${project_ld_output})
+     add_dependencies(${COMPONENT_LIB} esp32c3_linker_script)
+ 
+     # disable stack protection in files which are involved in initialization of that feature
+diff --git a/components/esp32c3/Kconfig b/components/esp32c3/Kconfig
+index 72e7bfa5c9..6c74fb98f1 100644
+--- a/components/esp32c3/Kconfig
++++ b/components/esp32c3/Kconfig
+@@ -255,4 +255,14 @@ menu "ESP32C3-Specific"
+             This option provides a software workaround for this issue. Configure to isolate all
+             GPIO pins in sleep state.
+ 
++    config ESP_PRIVILEGE_SEPARATION_ENABLE
++        bool "Enable privilege separation using WORLD controller"
++        default n
++        select FREERTOS_SUPPORT_STATIC_ALLOCATION
++        select FREERTOS_ENABLE_STATIC_TASK_CLEAN_UP
++        select FREERTOS_PLACE_FUNCTIONS_INTO_FLASH
++        select NEWLIB_NANO_FORMAT
++        help
++            Enable user kernel separation
++
+ endmenu  # ESP32C3-Specific
+diff --git a/components/esp32c3/ld/esp32c3.project.ld.in b/components/esp32c3/ld/esp32c3.project.ld.in
+index b36c4cbcb2..78d75dcda8 100644
+--- a/components/esp32c3/ld/esp32c3.project.ld.in
++++ b/components/esp32c3/ld/esp32c3.project.ld.in
+@@ -1,3 +1,14 @@
++#include "sdkconfig.h"
++
++/*
++ * DRAM region from 0x3FCDF060 is reserved for ROM functions
++ * and user app should not be able to access it. A split line
++ * is added to protect reserved ROM region. As the split line
++ * can only be added at 256 byte aligned address, alignment
++ * correction is used here.
++ */
++#define ROM_DRAM_RESERVE_START          ((0x3FCDF060) & ~((256) - 1))
++
+ /* Default entry point */
+ ENTRY(call_start_cpu0);
+ 
+@@ -126,6 +137,13 @@ SECTIONS
+   .iram0.text :
+   {
+     _iram_start = ABSOLUTE(.);
++#ifdef CONFIG_ESP_PRIVILEGE_SEPARATION_ENABLE
++    _reserve_w1_iram_start = ABSOLUTE(.);
++    . += CONFIG_PA_ALLOCATE_USER_IRAM_SIZE;
++    . += 16;
++    . = ALIGN (0x200);
++    _reserve_w1_iram_end = ABSOLUTE(.);
++#endif
+     /* Vectors go to start of IRAM */
+     ASSERT(ABSOLUTE(.) % 0x100 == 0, "vector address must be 256 byte aligned");
+     KEEP(*(.exception_vectors.text));
+@@ -242,6 +260,27 @@ SECTIONS
+     _bss_end = ABSOLUTE(.);
+   } > dram0_0_seg
+ 
++#ifdef CONFIG_ESP_PRIVILEGE_SEPARATION_ENABLE
++  .reserve_w1_dram (NOLOAD) :
++  {
++     /* Assign W1 DRAM start address as per the size configured in Kconfig.
++      * 0x3FCDF060 - 0x3FCE0000 space is reserved for ROM code so to avoid
++      * overlapping for reserved memory regions, treat 0x3FCDF060 as the end of DRAM region
++      */
++#if CONFIG_PA_MEMORY_ALLOCATE_PROTECTED
++     _reserve_w1_dram_start = ABSOLUTE(_data_start + CONFIG_PA_ALLOCATE_DRAM_SIZE);
++#elif CONFIG_PA_MEMORY_ALLOCATE_USER
++     _reserve_w1_dram_start = ABSOLUTE(ROM_DRAM_RESERVE_START - CONFIG_PA_ALLOCATE_DRAM_SIZE);
++#endif
++     /* Align the starting boundary to 512 bytes as it is a requirement for the PMS split line */
++     _reserve_w1_dram_start = ABSOLUTE((_reserve_w1_dram_start + 0x200 - 1) & ~(0x200 - 1));
++     _reserve_w1_dram_end = ABSOLUTE(ROM_DRAM_RESERVE_START);
++  } > dram0_0_seg
++
++  ASSERT((_heap_start <= _reserve_w1_dram_start),
++          "Protected DRAM segment contents does not fit.")
++#endif
++
+   ASSERT(((_bss_end - ORIGIN(dram0_0_seg)) <= LENGTH(dram0_0_seg)), "DRAM segment data does not fit.")
+ 
+   .flash.text :
+diff --git a/components/hal/interrupt_controller_hal.c b/components/hal/interrupt_controller_hal.c
+index f7e815beff..e50c0db74d 100644
+--- a/components/hal/interrupt_controller_hal.c
++++ b/components/hal/interrupt_controller_hal.c
+@@ -22,7 +22,7 @@ static bool is_interrupt_number_reserved(int interrupt_number)
+ {
+     // Workaround to reserve interrupt number 1 for Wi-Fi, 5,8 for Bluetooth, 6 for "permanently disabled interrupt"
+     // [TODO: IDF-2465]
+-    const uint32_t reserved = BIT(1) | BIT(5) | BIT(6) | BIT(8);
++    const uint32_t reserved = BIT(1) | BIT(2) | BIT(5) | BIT(6) | BIT(8);
+     if (reserved & BIT(interrupt_number)) {
+         return true;
+     }
+diff --git a/components/partition_table/gen_esp32part.py b/components/partition_table/gen_esp32part.py
+index ec04b9b0b2..45f44b4119 100755
+--- a/components/partition_table/gen_esp32part.py
++++ b/components/partition_table/gen_esp32part.py
+@@ -37,6 +37,8 @@ PARTITION_TABLE_SIZE  = 0x1000  # Size of partition table
+ 
+ MIN_PARTITION_SUBTYPE_APP_OTA = 0x10
+ NUM_PARTITION_SUBTYPE_APP_OTA = 16
++MIN_PARTITION_SUBTYPE_USER_APP_OTA = 0x40
++NUM_PARTITION_SUBTYPE_USER_APP_OTA = 2
+ 
+ __version__ = '1.2'
+ 
+@@ -62,6 +64,7 @@ SUBTYPES = {
+         'nvs_keys': 0x04,
+         'efuse': 0x05,
+         'undefined': 0x06,
++        'user_ota': 0x50,
+         'esphttpd': 0x80,
+         'fat': 0x81,
+         'spiffs': 0x82,
+@@ -278,6 +281,10 @@ class PartitionDefinition(object):
+     for ota_slot in range(NUM_PARTITION_SUBTYPE_APP_OTA):
+         SUBTYPES[TYPES['app']]['ota_%d' % ota_slot] = MIN_PARTITION_SUBTYPE_APP_OTA + ota_slot
+ 
++    # add subtypes for the 2 User OTA slot values ("ota_XX, etc.")
++    for ota_slot in range(NUM_PARTITION_SUBTYPE_USER_APP_OTA):
++        SUBTYPES[TYPES['app']]['user_%d' % ota_slot] = MIN_PARTITION_SUBTYPE_USER_APP_OTA + ota_slot
++
+     def __init__(self):
+         self.name = ''
+         self.type = None
+diff --git a/components/riscv/vectors.S b/components/riscv/vectors.S
+index 89bf09e1e9..16bd55b690 100644
+--- a/components/riscv/vectors.S
++++ b/components/riscv/vectors.S
+@@ -16,9 +16,26 @@
+ #include "riscv/rvruntime-frames.h"
+ #include "soc/soc_caps.h"
+ #include "sdkconfig.h"
+-
+-
+-    .equ SAVE_REGS, 32
++#include "soc/sensitive_reg.h"
++#include "soc/world_controller_reg.h"
++#include "soc/extmem_reg.h"
++
++#define W1_EXCEPTION_MAGIC  21
++#define EXCCAUSE_ECALL  11
++
++/*
++ * uxTCBNumber and uxTaskNumber members are added in TCB structure when
++ * FreeRTOS Trace facility is enabled. WORLD offset is changed by 8 bytes
++ * because both members are 4 bytes in size.
++ */
++#ifdef CONFIG_FREERTOS_USE_TRACE_FACILITY
++#define WORLD_OFFSET    (0x4c + CONFIG_FREERTOS_MAX_TASK_NAME_LEN + 3 + 8)&~3
++#else
++#define WORLD_OFFSET    (0x4c + CONFIG_FREERTOS_MAX_TASK_NAME_LEN + 3)&~3
++#endif
++
++    /* Save CSRs when servicing interrupts */
++    .equ SAVE_REGS, 40
+     .equ CONTEXT_SIZE, (SAVE_REGS * 4)
+     .equ panic_from_exception, xt_unhandled_exception
+     .equ panic_from_isr, panicHandler
+@@ -65,6 +82,35 @@
+     sw   t0, RV_STK_MEPC(sp)
+ .endm
+ 
++.macro save_world
++    mv      t0, zero
++    csrr    t1, mcause
++    li      t2, 0x80000000
++    bleu    t1, t2, _from_exception
++
++    li      t2, 0x7fffffff
++    and     t0, t1, t2
++_from_exception:
++    /* t0 contains the mcause that is also the STATUSTABLE entry */
++    la      t1, WORLD_CONTROL_CORE_X_STATUSTABLE(0,0)
++    slli    t0, t0, 2
++    add     t2, t1, t0
++    lw      t3, 0x0(t2)
++    /* Zero out the STATUSTABLE contents and store the WORLD */
++    sw      zero, 0x0(t2)
++    andi    t3, t3, 1
++
++    la      t4, pxCurrentTCB
++    lw      t5, 0x00(t4)
++    sw      t3, WORLD_OFFSET(t5)
++
++    /* Set WORLD controller MIE to track changes in STATUSTABLE */
++    la      t0, WORLD_CONTROL_CORE_X_MSTATUS_MIE(0)
++    li      t1, 1
++    sw      t1, 0x0(t0)
++    fence
++.endm
++
+ /* Restore the general purpose registers (excluding gp) from the context on
+  * the stack. The context is then deallocated. The default size is CONTEXT_SIZE
+  * but it can be overriden. */
+@@ -106,6 +152,29 @@
+     csrw    mepc, t0
+ .endm
+ 
++.macro restore_world
++    la      t0, pxCurrentTCB
++    lw      t0, 0x00(t0)
++    lw      t0, WORLD_OFFSET(t0)
++    beq     t0, zero, skip_restore_world
++
++    /* Prepare WORLD controller for switch */
++    li      t1, 2
++    la      t2, WORLD_CONTROL_CORE_X_WORLD_PREPARE(0)
++    sw      t1, 0x0(t2)
++
++    /* Set TRIGGER_ADDR to the return address; held by MEPC */
++    lw      t1, RV_STK_MEPC(sp)
++    la      t2, WORLD_CONTROL_CORE_X_WORLD_TRIGGER_ADDR(0)
++    sw      t1, 0x0(t2)
++
++    li      t1, 1
++    la      t2, WORLD_CONTROL_CORE_X_WORLD_UPDATE(0)
++    sw      t1, 0x0(t2)
++skip_restore_world:
++    fence
++.endm
++
+     .global rtos_int_enter
+     .global rtos_int_exit
+     .global _global_interrupt_handler
+@@ -148,6 +217,35 @@ _vector_table:
+     /* Exception handler.*/
+     .type _panic_handler, @function
+ _panic_handler:
++
++#if CONFIG_ESP_PRIVILEGE_SEPARATION_ENABLE
++    csrw    mscratch, t0
++
++    /* If exception caused by ecall, skip other W1 checks */
++    csrr    t0, mcause
++    xori    t0, t0, EXCCAUSE_ECALL
++    beq     t0, zero, w0_exception
++
++    /* Check if the exception occurred in W1 environment,
++     * if so, delegate to _interrupt_handler
++     */
++    la      t0, WORLD_CONTROL_CORE_X_STATUSTABLE(0,0)
++    lw      t0, 0x0(t0)
++    andi    t0, t0, 1
++    beq     t0, zero, w0_exception
++    csrr    t0, mscratch
++
++    /* Use mscratch temporarily to notify _interrupt_handler about the W1 exception
++     * Storing a number (21, 0b10101) in mscratch
++     */
++    csrrwi  zero, mscratch, W1_EXCEPTION_MAGIC
++
++    j       _interrupt_handler
++
++w0_exception:
++    csrr    t0, mscratch
++#endif
++
+     /* Allocate space on the stack and store general purpose registers */
+     save_general_regs RV_STK_FRMSZ
+ 
+@@ -159,6 +257,23 @@ _panic_handler:
+ 
+     /* Save CSRs */
+     sw    t0, RV_STK_SP(sp)
++
++#if CONFIG_ESP_PRIVILEGE_SEPARATION_ENABLE
++    /* If exception caused by ECALL, delegate to __ecall_handler and store
++     * privileged registers in kernel stack
++     */
++    csrr    t2, mcause
++    li      t3, EXCCAUSE_ECALL
++    bne     t2, t3, _skip_ecall
++
++    .global __ecall_handler
++
++    // Need to be defined by the application
++    call    __ecall_handler             // Should not return
++
++_skip_ecall:
++#endif
++
+     csrr  t0, mepc
+     sw    t0, RV_STK_MEPC(sp)
+     csrr  t0, mstatus
+@@ -221,6 +336,43 @@ _interrupt_handler:
+      * the interrupt happened. */
+     save_general_regs
+     save_mepc
++#if CONFIG_ESP_PRIVILEGE_SEPARATION_ENABLE
++    save_world
++
++    /* Save CSRs */
++    sw    gp, RV_STK_GP(sp)
++
++    addi  t0, sp, CONTEXT_SIZE /* restore sp with the value when trap happened */
++
++    sw    t0, RV_STK_SP(sp)
++    csrr  t0, mstatus
++    sw    t0, RV_STK_MSTATUS(sp)
++    csrr  t0, mtvec
++    sw    t0, RV_STK_MTVEC(sp)
++    csrr  t0, mcause
++    sw    t0, RV_STK_MCAUSE(sp)
++    csrr  t0, mtval
++    sw    t0, RV_STK_MTVAL(sp)
++    csrr  t0, mhartid
++    sw    t0, RV_STK_MHARTID(sp)
++
++    /* Check if we arrive here because of exception in user space */
++    csrr    t0, mscratch
++    li      t1, W1_EXCEPTION_MAGIC
++    bne     t0, t1, 1f
++
++    /* It is indeed from W1 exception.
++     * Set the mcause to 2 (interrupt reserved for W1 exception)
++     * The actual mcause is already stored on the stack
++     */
++    csrrwi  zero, mcause, 2
++
++    /* Clear mscratch CSR */
++    csrw   mscratch, zero
++
++    fence
++1:
++#else
+ 
+     /* Though it is not necessary we save GP and SP here.
+      * SP is necessary to help GDB to properly unwind
+@@ -232,6 +384,7 @@ _interrupt_handler:
+     addi  t0, sp, CONTEXT_SIZE /* restore sp with the value when interrupt happened */
+     /* Save SP */
+     sw    t0, RV_STK_SP(sp)
++#endif
+ 
+     /* Before doing anythig preserve the stack pointer */
+     /* It will be saved in current TCB, if needed */
+@@ -308,6 +461,9 @@ _interrupt_handler:
+     /* restore the rest of the registers */
+     csrw    mcause, s1
+     csrw    mstatus, s2
++#if CONFIG_ESP_PRIVILEGE_SEPARATION_ENABLE
++    restore_world
++#endif
+     restore_mepc
+     restore_general_regs
+ 
+diff --git a/components/soc/esp32c3/include/soc/world_controller_reg.h b/components/soc/esp32c3/include/soc/world_controller_reg.h
+new file mode 100644
+index 0000000000..57eeb1e2bd
+--- /dev/null
++++ b/components/soc/esp32c3/include/soc/world_controller_reg.h
+@@ -0,0 +1,66 @@
++// Copyright 2022 Espressif Systems (Shanghai) PTE LTD
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++#pragma once
++
++#define WORLD_CONTROL_BASE                                      0x600D0000
++#define WORLD_CONTROL_CORE_X_BASE(i)                            ((WORLD_CONTROL_BASE) + 0x400*(i))
++
++#define WORLD_CONTROL_CORE_X_MTVEC_BASE(i)                      (WORLD_CONTROL_CORE_X_BASE(i) + 0x000)
++#define WORLD_CONTROL_CORE_X_MSTATUS_MIE(i)                     (WORLD_CONTROL_CORE_X_BASE(i) + 0x004)
++#define WORLD_CONTROL_CORE_X_ENTRY_CHECK(i)                     (WORLD_CONTROL_CORE_X_BASE(i) + 0x008)
++#define WORLD_CONTROL_CORE_X_WORLD_CAHNGE_OPT(i)                (WORLD_CONTROL_CORE_X_BASE(i) + 0x020)
++#define WORLD_CONTROL_CORE_X_MESSAGE_ADDR(i)                    (WORLD_CONTROL_CORE_X_BASE(i) + 0x024)
++#define WORLD_CONTROL_CORE_X_MESSAGE_MAX(i)                     (WORLD_CONTROL_CORE_X_BASE(i) + 0x028)
++#define WORLD_CONTROL_CORE_X_STATUSTABLE(i, j)                  (WORLD_CONTROL_CORE_X_BASE(i) + 0x040 + 0x4*(j))
++#define WORLD_CONTROL_CORE_X_STATUSTABLE_CURRENT(i)             (WORLD_CONTROL_CORE_X_BASE(i) + 0x0E0)
++#define WORLD_CONTROL_CORE_X_MESSAGE_PHASE(i)                   (WORLD_CONTROL_CORE_X_BASE(i) + 0x0E4)
++#define WORLD_CONTROL_CORE_X_WORLD_TRIGGER_ADDR(i)              (WORLD_CONTROL_CORE_X_BASE(i) + 0x140)
++#define WORLD_CONTROL_CORE_X_WORLD_PREPARE(i)                   (WORLD_CONTROL_CORE_X_BASE(i) + 0x144)
++#define WORLD_CONTROL_CORE_X_WORLD_UPDATE(i)                    (WORLD_CONTROL_CORE_X_BASE(i) + 0x148)
++#define WORLD_CONTROL_CORE_X_WORLD_CANCEL(i)                    (WORLD_CONTROL_CORE_X_BASE(i) + 0x14c)
++#define WORLD_CONTROL_CORE_X_WORLD_IRAM0(i)                     (WORLD_CONTROL_CORE_X_BASE(i) + 0x150)
++#define WORLD_CONTROL_CORE_X_WORLD_DRAM0_PIF(i)                 (WORLD_CONTROL_CORE_X_BASE(i) + 0x154)
++#define WORLD_CONTROL_CORE_X_WORLD_PHASE(i)                     (WORLD_CONTROL_CORE_X_BASE(i) + 0x158)
++#define WORLD_CONTROL_CORE_X_NMI_MASK_ENABLE(i)                 (WORLD_CONTROL_CORE_X_BASE(i) + 0x180)
++#define WORLD_CONTROL_CORE_X_NMI_MASK_TRIGGER_ADDR(i)           (WORLD_CONTROL_CORE_X_BASE(i) + 0x184)
++#define WORLD_CONTROL_CORE_X_NMI_MASK_DISABLE(i)                (WORLD_CONTROL_CORE_X_BASE(i) + 0x188)
++#define WORLD_CONTROL_CORE_X_NMI_MASK_CANCEL(i)                 (WORLD_CONTROL_CORE_X_BASE(i) + 0x18c)
++#define WORLD_CONTROL_CORE_X_NMI_MASK(i)                        (WORLD_CONTROL_CORE_X_BASE(i) + 0x190)
++#define WORLD_CONTROL_CORE_X_NMI_MASK_PHASE(i)                  (WORLD_CONTROL_CORE_X_BASE(i) + 0x194)
++
++#define WORLD_CONTROLLER_DMA_APBPERI_SPI2                       (WORLD_CONTROL_BASE + 0x800)
++#define WORLD_CONTROLLER_DMA_APBPERI_SPI3                       (WORLD_CONTROL_BASE + 0x804)
++#define WORLD_CONTROLLER_DMA_APBPERI_UCHI0                      (WORLD_CONTROL_BASE + 0x808)
++#define WORLD_CONTROLLER_DMA_APBPERI_I2S0                       (WORLD_CONTROL_BASE + 0x80C)
++#define WORLD_CONTROLLER_DMA_APBPERI_I2S1                       (WORLD_CONTROL_BASE + 0x810)
++#define WORLD_CONTROLLER_DMA_APBPERI_LCD_CAM                    (WORLD_CONTROL_BASE + 0x814)
++#define WORLD_CONTROLLER_DMA_APBPERI_AES                        (WORLD_CONTROL_BASE + 0x818)
++#define WORLD_CONTROLLER_DMA_APBPERI_SHA                        (WORLD_CONTROL_BASE + 0x81C)
++#define WORLD_CONTROLLER_DMA_APBPERI_ADC_DAC                    (WORLD_CONTROL_BASE + 0x820)
++#define WORLD_CONTROLLER_DMA_APBPERI_USB                        (WORLD_CONTROL_BASE + 0x824)
++#define WORLD_CONTROLLER_DMA_APBPERI_SDIO_HOST                  (WORLD_CONTROL_BASE + 0x828)
++#define WORLD_CONTROLLER_DMA_APBPERI_MAC                        (WORLD_CONTROL_BASE + 0x82C)
++#define WORLD_CONTROLLER_DMA_APBPERI_BACKUP                     (WORLD_CONTROL_BASE + 0x830)
++#define WORLD_CONTROLLER_DMA_APBPERI_SLC                        (WORLD_CONTROL_BASE + 0x834)
++#define WORLD_CONTROLLER_DMA_APBPERI_LC                         (WORLD_CONTROL_BASE + 0x838)
++#define WORLD_CONTROLLER_EDMA_SPI2                              (WORLD_CONTROL_BASE + 0x900)
++#define WORLD_CONTROLLER_EDMA_SPI3                              (WORLD_CONTROL_BASE + 0x904)
++#define WORLD_CONTROLLER_EDMA_UCHI0                             (WORLD_CONTROL_BASE + 0x908)
++#define WORLD_CONTROLLER_EDMA_I2S0                              (WORLD_CONTROL_BASE + 0x90C)
++#define WORLD_CONTROLLER_EDMA_I2S1                              (WORLD_CONTROL_BASE + 0x910)
++#define WORLD_CONTROLLER_EDMA_LCD_CAM                           (WORLD_CONTROL_BASE + 0x914)
++#define WORLD_CONTROLLER_EDMA_AES                               (WORLD_CONTROL_BASE + 0x918)
++#define WORLD_CONTROLLER_EDMA_SHA                               (WORLD_CONTROL_BASE + 0x91C)
++#define WORLD_CONTROLLER_EDMA_ADC_DAC                           (WORLD_CONTROL_BASE + 0x920)
+diff --git a/components/soc/esp32c3/soc_memory_layout.c b/components/soc/esp32c3/soc_memory_layout.c
+index ba0ae819cb..4199a52331 100644
+--- a/components/soc/esp32c3/soc_memory_layout.c
++++ b/components/soc/esp32c3/soc_memory_layout.c
+@@ -61,7 +61,7 @@ const size_t soc_memory_type_count = sizeof(soc_memory_types) / sizeof(soc_memor
+  *       this list should always be sorted from low to high by start address.
+  *
+  */
+-const soc_memory_region_t soc_memory_regions[] = {
++__attribute__((weak)) const soc_memory_region_t soc_memory_regions[] = {
+     { 0x3FC80000, 0x20000, SOC_MEMORY_TYPE_DEFAULT, 0x40380000}, //Block 4,  can be remapped to ROM, can be used as trace memory
+     { 0x3FCA0000, 0x20000, SOC_MEMORY_TYPE_DEFAULT, 0x403A0000}, //Block 5,  can be remapped to ROM, can be used as trace memory
+     { 0x3FCC0000, 0x20000, 1, 0x403C0000}, //Block 9,  can be used as trace memory
+@@ -70,7 +70,7 @@ const soc_memory_region_t soc_memory_regions[] = {
+ #endif
+ };
+ 
+-const size_t soc_memory_region_count = sizeof(soc_memory_regions) / sizeof(soc_memory_region_t);
++__attribute__((weak)) const size_t soc_memory_region_count = sizeof(soc_memory_regions) / sizeof(soc_memory_region_t);
+ 
+ 
+ extern int _data_start, _heap_start, _iram_start, _iram_end, _rtc_force_slow_end;
+diff --git a/components/spi_flash/include/esp_partition.h b/components/spi_flash/include/esp_partition.h
+index f1ce8dee94..2291d24756 100644
+--- a/components/spi_flash/include/esp_partition.h
++++ b/components/spi_flash/include/esp_partition.h
+@@ -77,6 +77,12 @@ typedef enum {
+     ESP_PARTITION_SUBTYPE_APP_OTA_14 = ESP_PARTITION_SUBTYPE_APP_OTA_MIN + 14,//!< OTA partition 14
+     ESP_PARTITION_SUBTYPE_APP_OTA_15 = ESP_PARTITION_SUBTYPE_APP_OTA_MIN + 15,//!< OTA partition 15
+     ESP_PARTITION_SUBTYPE_APP_OTA_MAX = ESP_PARTITION_SUBTYPE_APP_OTA_MIN + 16,//!< Max subtype of OTA partition
++
++    ESP_PARTITION_SUBTYPE_APP_USER_MIN = 0x40,
++    ESP_PARTITION_SUBTYPE_APP_USER_0 = ESP_PARTITION_SUBTYPE_APP_USER_MIN + 0,
++    ESP_PARTITION_SUBTYPE_APP_USER_1 = ESP_PARTITION_SUBTYPE_APP_USER_MIN + 1,
++    ESP_PARTITION_SUBTYPE_DATA_USER_OTA = 0x50,
++
+     ESP_PARTITION_SUBTYPE_APP_TEST = 0x20,                                    //!< Test application partition
+ 
+     ESP_PARTITION_SUBTYPE_DATA_OTA = 0x00,                                    //!< OTA selection partition
+diff --git a/tools/idf_monitor.py b/tools/idf_monitor.py
+index 40f2e83717..def0b90b0d 100755
+--- a/tools/idf_monitor.py
++++ b/tools/idf_monitor.py
+@@ -857,6 +857,11 @@ class Monitor(object):
+     def process_panic_output(self, panic_output):
+         panic_output_decode_script = os.path.join(os.path.dirname(__file__), '..', 'tools', 'gdb_panic_server.py')
+         panic_output_file = None
++        user_app = os.path.dirname(self.elf_file) + '/user_app/user_app.elf'
++        if os.path.isfile(user_app):
++            user_symbols = 'add-symbol-file %s' % user_app
++        else:
++            user_symbols = ''
+         try:
+             # On Windows, the temporary file can't be read unless it is closed.
+             # Set delete=False and delete the file manually later.
+@@ -867,6 +872,7 @@ class Monitor(object):
+             cmd = [self.toolchain_prefix + 'gdb',
+                    '--batch', '-n',
+                    self.elf_file,
++                   '-ex', user_symbols,
+                    '-ex', "target remote | \"{python}\" \"{script}\" --target {target} \"{output_file}\""
+                    .format(python=sys.executable,
+                            script=panic_output_decode_script,

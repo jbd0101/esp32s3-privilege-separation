@@ -1,0 +1,1 @@
+source "$IDF_PATH/components/esptool_py/Kconfig.projbuild"

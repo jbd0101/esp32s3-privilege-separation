@@ -1,0 +1,8 @@
+
+1400  custom  esp_kernel_start_rr_dispatcher             sys_esp_kernel_start_rr_dispatcher
+1401  custom  esp_kernel_start_preemptive_dispatcher     sys_esp_kernel_start_preemptive_dispatcher
+1402  custom  esp_kernel_start_deep_sleep_dispatcher     sys_esp_kernel_start_deep_sleep_dispatcher
+1403  custom  esp_save_task_ctx                          sys_save_task_ctx
+1404  custom  esp_get_uint32_secret                      sys_get_uint32_secret
+1405  custom  esp_prepare_task_ctx                       sys_prepare_task_ctx
+1406  custom  esp_notify_dispatch                        sys_notify_dispatch
